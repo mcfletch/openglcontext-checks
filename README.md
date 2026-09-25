@@ -145,8 +145,9 @@ alive), or hold the object in the entry and compare it on lookup.
 Not reported: a table that exists for one call (a local name bound only to a
 container made in the function, used only in place, never passed on,
 returned, stored or read from a nested function), a set or dict display that
-is compared or measured with `len` and dropped, and a lookup whose entry the
-function compares by identity with the object (`entry[0] is x`).
+is compared or measured with `len` and dropped, and a lookup whose entry is
+compared by identity with the object, directly (`table.get(id(x)) is x`) or
+through the name it is assigned to (`entry[0] is x`).
 
 ```python
 _FITS[id(positions)] = fitted          # OGC131

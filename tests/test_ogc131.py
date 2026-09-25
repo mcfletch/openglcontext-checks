@@ -111,3 +111,11 @@ def test_a_table_walked_after_it_is_filled_stays_in_the_call():
         '    print(key)',
     ]
     assert _in_function(body) == []
+
+
+def test_a_lookup_compared_the_other_way_round_is_checked_too():
+    assert _found('same = node is table.get(id(node))\n') == []
+
+
+def test_a_lookup_compared_with_something_else_is_still_a_lookup():
+    assert len(_found('same = table.get(id(node)) is other\n')) == 1

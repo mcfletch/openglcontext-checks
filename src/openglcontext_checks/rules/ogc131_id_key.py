@@ -50,8 +50,9 @@ class IdAsKey(Rule):
     - A set or dict display that is compared or measured with `len` and
       never stored, as in `len({id(v) for v in views}) == len(views)`.
     - A lookup whose entry is compared by identity with the object: the
-      result assigned to a name, and the function comparing a part of it
-      (`entry[0] is x`, `entry.path is not x`) with `x`.
+      lookup itself (`table.get(id(x)) is x`), or the result assigned to a
+      name and the function comparing a part of it (`entry[0] is x`,
+      `entry.path is not x`) with `x`.
 
     Use instead: key on the object (`WeakKeyDictionary` where the table should
     not keep it alive), or hold the object in the entry and compare it on
@@ -141,6 +142,10 @@ class IdAsKey(Rule):
                 if entry is None or entry[0] is not bvolume:
                     entry = self._boxes[id(bvolume)] = (bvolume, measure(bvolume))
                 return entry[1]
+        """),
+        snippet("""
+            def mirrors(self, frame):
+                return [r for r in frame.records if self._paths.get(id(r.path)) is r.path]
         """),
         snippet("""
             def zones(self, path):
@@ -575,8 +580,10 @@ _IDENTITY = (ast.Is, ast.IsNot)
 def _compared_on_lookup(use: ast.AST, held: str, symbols: Symbols) -> bool:
     """Whether a lookup's entry is checked to be the keyed object's before use.
 
-    The lookup is assigned to a name, and the function compares a part of
-    that entry (`entry[0]`, `entry.path`) by identity with the object.
+    Either the lookup is itself compared by identity with the object
+    (`table.get(id(x)) is x`), or it is assigned to a name and the function
+    compares a part of that entry (`entry[0]`, `entry.path`) by identity with
+    the object.
     """
     if isinstance(use, ast.Subscript):
         if not isinstance(use.ctx, ast.Load):
@@ -587,7 +594,10 @@ def _compared_on_lookup(use: ast.AST, held: str, symbols: Symbols) -> bool:
         and use.func.attr in ('get', 'pop')
     ):
         return False
-    assign = symbols.parent(use)
+    parent = symbols.parent(use)
+    if _identity_between(parent, use, held):
+        return True
+    assign = parent
     if not (
         isinstance(assign, ast.Assign)
         and assign.value is use
@@ -598,18 +608,27 @@ def _compared_on_lookup(use: ast.AST, held: str, symbols: Symbols) -> bool:
     entry = assign.targets[0].id
     scope: ast.AST = symbols.enclosing_function(use) or list(symbols.ancestors(use))[-1]
     for node in ast.walk(scope):
-        if not (
-            isinstance(node, ast.Compare)
-            and len(node.ops) == 1
-            and isinstance(node.ops[0], _IDENTITY)
-        ):
-            continue
-        for part, other in ((node.left, node.comparators[0]), (node.comparators[0], node.left)):
+        for part in (getattr(node, 'left', None), *getattr(node, 'comparators', ())):
             if (
                 isinstance(part, ast.Subscript | ast.Attribute)
                 and isinstance(part.value, ast.Name)
                 and part.value.id == entry
-                and ast.dump(other) == held
+                and _identity_between(node, part, held)
             ):
                 return True
     return False
+
+
+def _identity_between(compare: ast.AST | None, part: ast.AST, held: str) -> bool:
+    """Whether `compare`, an expression `part` is an operand of, is `part is x` or `x is part`.
+
+    `x` is the held object; `is not` counts as well as `is`.
+    """
+    if not (
+        isinstance(compare, ast.Compare)
+        and len(compare.ops) == 1
+        and isinstance(compare.ops[0], _IDENTITY)
+    ):
+        return False
+    other = compare.comparators[0] if compare.left is part else compare.left
+    return ast.dump(other) == held
