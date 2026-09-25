@@ -9,6 +9,7 @@ from .ogc161_import_time import WorkAtImport
 from .ogc201_unreasoned_suppression import UnreasonedSuppression
 from .ogc221_skip_in_except import SkipInExcept
 from .ogc222_test_without_assertion import TestWithoutAssertion
+from .ogc223_pass_in_test_handler import PassInTestHandler
 
 #: One instance of every rule, in code order. Rules hold no state.
 ALL_RULES: tuple[Rule, ...] = (
@@ -18,6 +19,7 @@ ALL_RULES: tuple[Rule, ...] = (
     UnreasonedSuppression(),
     SkipInExcept(),
     TestWithoutAssertion(),
+    PassInTestHandler(),
 )
 
 #: Each rule by its code.

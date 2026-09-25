@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from ..findings import Finding
 from .base import Invalid, Rule, snippet
+from .testfunctions import is_test_function
 
 if TYPE_CHECKING:
     from ..engine import Module
@@ -134,17 +135,6 @@ class TestWithoutAssertion(Rule):
             '%s has no assertion: it passes whatever the code does, unless something raises; '
             'assert on the result, or use pytest.raises' % (node.name,),
         )
-
-
-def is_test_function(node: ast.FunctionDef | ast.AsyncFunctionDef, symbols: Symbols) -> bool:
-    """Whether pytest collects `node` as a test: named `test*`, at module level
-    or a method of a module-level class."""
-    if not node.name.startswith('test'):
-        return False
-    parent = symbols.parent(node)
-    if isinstance(parent, ast.ClassDef):
-        parent = symbols.parent(parent)
-    return isinstance(parent, ast.Module)
 
 
 def _asserts(function: ast.FunctionDef | ast.AsyncFunctionDef, symbols: Symbols) -> bool:
