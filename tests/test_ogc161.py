@@ -61,3 +61,15 @@ def test_the_test_of_a_main_guard_is_import_time():
 
 def test_a_reference_to_a_function_that_is_not_called_is_not_reported():
     assert _found('import os\nLOOKUP = os.getenv\n') == []
+
+
+def test_a_program_in_the_script_scope_is_not_reported():
+    """A program's module level is its start-up, where it reads its configuration."""
+    source = 'import os, sys\nos.environ.setdefault("X", "1")\nARGS = sys.argv[1:]\n'
+    assert check_source(source, codes=['OGC161'], scopes=['script']) == []
+
+
+def test_the_script_scope_exempts_only_this_rule():
+    source = 'import os\nX = os.environ  # noqa: OGC161\n'
+    found = check_source(source, codes=['OGC161', 'OGC201'], scopes=['script'])
+    assert [finding.code for finding in found] == ['OGC201']

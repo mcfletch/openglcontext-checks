@@ -16,9 +16,12 @@ Keys:
   in `paths` is checked even where an exclusion matches it; exclusions apply
   to what is found beneath it.
 - `per-file-ignores`: a table of glob to codes not run on the files it matches.
-- `scopes`: a table of scope name to globs; the `test` scope, which OGC221 to
-  OGC223 run in, defaults to `tests/**`, `**/test_*.py`, `**/*_test.py` and
-  `**/conftest.py`.
+- `scopes`: a table of scope name to globs. A path is in a scope when it
+  matches one of its globs and none of its globs written with a leading `!`.
+  The `test` scope, which OGC221 to OGC223 run in, defaults to `tests/**`,
+  `**/test_*.py`, `**/*_test.py` and `**/conftest.py`. The `script` scope,
+  the programs run by path whose module level is their start-up and which
+  OGC161 does not run on, is empty unless the project names its programs.
 
 An unknown key, an unknown code or scope, or a value of the wrong type is a
 `ConfigError`.
@@ -59,10 +62,13 @@ DEFAULT_EXCLUDE = (
 #: The globs each scope has where the configuration does not name its own.
 DEFAULT_SCOPES: Mapping[str, tuple[str, ...]] = {
     'test': ('tests/**', '**/test_*.py', '**/*_test.py', '**/conftest.py'),
+    'script': (),
 }
 
-#: Every scope some rule runs in.
-KNOWN_SCOPES = frozenset(rule.scope for rule in ALL_RULES if rule.scope)
+#: Every scope some rule runs in, or does not run in.
+KNOWN_SCOPES = frozenset(
+    scope for rule in ALL_RULES for scope in (rule.scope, rule.exempt_scope) if scope
+)
 
 _KEYS = frozenset({'paths', 'select', 'ignore', 'exclude', 'per-file-ignores', 'scopes'})
 
@@ -101,11 +107,7 @@ class Config:
 
     def scopes_for(self, path: str) -> frozenset[str]:
         """The scopes the project-relative `path` is in."""
-        return frozenset(
-            name
-            for name, patterns in self.scopes
-            if any(matches(pattern, path) for pattern in patterns)
-        )
+        return frozenset(name for name, patterns in self.scopes if _in_scope(patterns, path))
 
     def is_excluded(self, path: str, named: str = '') -> bool:
         """Whether the project-relative `path` is left out.
@@ -154,6 +156,15 @@ def load_config(start: str) -> Config:
             return _from_table(table, directory, candidate)
         return Config(root=directory, source=candidate)
     return Config(root=start)
+
+
+def _in_scope(patterns: Sequence[str], path: str) -> bool:
+    """Whether `path` matches a glob of `patterns` and none of its `!` globs."""
+    wanted = [pattern for pattern in patterns if not pattern.startswith('!')]
+    unwanted = [pattern[1:] for pattern in patterns if pattern.startswith('!')]
+    return any(matches(pattern, path) for pattern in wanted) and not any(
+        matches(pattern, path) for pattern in unwanted
+    )
 
 
 def _parents(start: str) -> list[str]:

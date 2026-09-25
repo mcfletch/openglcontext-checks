@@ -67,6 +67,11 @@ class WorkAtImport(Rule):
     body of a function or lambda is not, nor the body of
     `if __name__ == '__main__':` or of `if TYPE_CHECKING:`.
 
+    A program run by path, whose module level is its start-up, reads its
+    configuration there by design. Nothing in its syntax says it is one, so a
+    project names its programs in the `script` scope, and the rule does not
+    run on them.
+
     Use instead: read configuration where it is used, in a function the
     application calls; in OpenGLContext, `renderoptions.env_flag_once` and
     `env_number_once` read an environment variable once, on first use.
@@ -74,6 +79,7 @@ class WorkAtImport(Rule):
 
     code = 'OGC161'
     name = 'configuration or I/O at import'
+    exempt_scope = 'script'
     nodes = (ast.Name, ast.Attribute)
 
     VALID = (

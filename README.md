@@ -62,10 +62,15 @@ exclude = ["src/generated"]           # not checked, beyond the defaults below
 
 [tool.openglcontext-checks.scopes]
 test = ["tests/**", "**/test_*.py"]   # the modules the test rules run on
+script = ["tools/*.py", "!tools/_*.py"]  # programs run by path; not OGC161
 ```
 
-The `test` scope, which OGC221 to OGC223 run in, defaults to `tests/**`,
-`**/test_*.py`, `**/*_test.py` and `**/conftest.py`. An unknown key, an
+A path is in a scope when it matches one of the scope's globs and none of
+the globs written with a leading `!`. The `test` scope, which OGC221 to
+OGC223 run in, defaults to `tests/**`, `**/test_*.py`, `**/*_test.py` and
+`**/conftest.py`. The `script` scope is empty unless a project names its
+programs: files run by path, whose module level is their start-up, which
+OGC161 does not run on. An unknown key, an
 unknown rule code or scope, or a value of the wrong type is a configuration
 error, and the run exits 2 naming it.
 
@@ -173,6 +178,12 @@ not in a function or lambda body, and not in the body of an
 Names resolve through imports. The set is closed: other calls at import are
 not reported. A value read at import is fixed before an application or a
 test can set it. Read it where it is used, in a function.
+
+A program run by path reads its configuration at module level by design, and
+nothing in its syntax says it is one: a project lists its programs in the
+`script` scope, and OGC161 does not run on them. A module with a `main()`
+that a console-script entry point imports is not a program in this sense;
+its start-up is `main()`.
 
 ```python
 BACKEND = os.environ.get('BACKEND', 'glfw')      # OGC161

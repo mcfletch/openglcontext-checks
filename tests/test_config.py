@@ -41,8 +41,7 @@ def test_the_table_is_found_from_a_directory_inside_the_project(tmp_path):
 def test_a_project_inside_another_does_not_take_the_outer_table(tmp_path):
     # The shape of a workspace of sub-projects: the outer table's paths and
     # globs are relative to the outer root and mean nothing in the inner one.
-    _project(tmp_path, '[tool.openglcontext-checks]\n'
-                       'paths = ["tools"]\nselect = ["OGC131"]\n')
+    _project(tmp_path, '[tool.openglcontext-checks]\npaths = ["tools"]\nselect = ["OGC131"]\n')
     inner = tmp_path / 'sub'
     inner.mkdir()
     _project(inner, '[project]\nname = "sub"\n')
@@ -187,3 +186,30 @@ def test_a_named_path_lifts_the_exclusions_that_match_it(tmp_path):
     assert not config.is_excluded('.claude/skills/scan.py', '.claude/skills')
     assert config.is_excluded('.claude/skills/generated/x.py', '.claude/skills')
     assert config.is_excluded('generated/x.py', '.')
+
+
+def test_the_script_scope_is_empty_until_a_project_names_its_programs(tmp_path):
+    _project(tmp_path, '[project]\nname = "x"\n')
+    config = load_config(str(tmp_path))
+    assert config.scopes_for('scripts/tool.py') == frozenset()
+    _project(tmp_path, '[tool.openglcontext-checks.scopes]\nscript = ["scripts/*.py"]\n')
+    assert load_config(str(tmp_path)).scopes_for('scripts/tool.py') == frozenset({'script'})
+
+
+def test_a_negated_glob_takes_paths_out_of_a_scope(tmp_path):
+    _project(
+        tmp_path,
+        """
+        [tool.openglcontext-checks.scopes]
+        script = ["tests/*.py", "!tests/test_*.py", "!tests/conftest.py"]
+        """,
+    )
+    config = load_config(str(tmp_path))
+    assert config.scopes_for('tests/demo.py') == frozenset({'script', 'test'})
+    assert config.scopes_for('tests/test_demo.py') == frozenset({'test'})
+    assert config.scopes_for('tests/conftest.py') == frozenset({'test'})
+
+
+def test_a_scope_of_only_negated_globs_holds_nothing(tmp_path):
+    _project(tmp_path, '[tool.openglcontext-checks.scopes]\nscript = ["!tests/*.py"]\n')
+    assert load_config(str(tmp_path)).scopes_for('scripts/tool.py') == frozenset()

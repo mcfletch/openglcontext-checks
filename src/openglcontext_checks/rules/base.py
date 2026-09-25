@@ -9,7 +9,8 @@ A rule reports through one or both of two methods. `visit` is handed each node
 of a type named in `nodes`, from one walk of the tree shared by every rule;
 `check_module` is called once per module, for a rule that reads something other
 than nodes (the comments, say). A rule with a `scope` runs only on modules the
-configuration places in that scope.
+configuration places in that scope, and a rule with an `exempt_scope` runs on
+every module but those.
 """
 
 from __future__ import annotations
@@ -46,6 +47,8 @@ class Rule:
     name: ClassVar[str]
     #: The configured scope a module must be in for this rule to run, or None.
     scope: ClassVar[str | None] = None
+    #: The configured scope whose modules this rule does not run on, or None.
+    exempt_scope: ClassVar[str | None] = None
     #: The node types `visit` is handed.
     nodes: ClassVar[tuple[type[ast.AST], ...]] = ()
     VALID: ClassVar[tuple[str, ...]] = ()

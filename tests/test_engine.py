@@ -40,6 +40,17 @@ class Silent(Rule):
     nodes = (ast.Name,)
 
 
+class FirstLineOutsideScripts(Rule):
+    """A module-level rule that runs everywhere but the `script` scope."""
+
+    code = 'OGC904'
+    name = 'not a script'
+    exempt_scope = 'script'
+
+    def check_module(self, module):
+        yield self.finding(1, 'not a script')
+
+
 RULES = [NamesCalledEval(), FirstLineInScope(), Silent()]
 
 
@@ -55,6 +66,14 @@ def test_a_rule_reports_the_node_it_was_handed():
 def test_a_scoped_rule_runs_only_in_its_scope():
     assert [finding.code for finding in _run('x = 1\n', scopes=['demo'])] == ['OGC902']
     assert _run('x = 1\n') == []
+
+
+def test_a_rule_does_not_run_in_the_scope_it_is_exempt_from():
+    rules = [FirstLineOutsideScripts()]
+    module = parse_module(b'x = 1\n', 'example.py', frozenset({'test'}))
+    assert [finding.code for finding in run_rules(module, rules)] == ['OGC904']
+    module = parse_module(b'x = 1\n', 'example.py', frozenset({'test', 'script'}))
+    assert run_rules(module, rules) == []
 
 
 def test_findings_come_back_in_source_order():

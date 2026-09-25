@@ -68,7 +68,12 @@ def parse_module(source: bytes, path: str, scopes: frozenset[str] = frozenset())
 
 def run_rules(module: Module, rules: Sequence[Rule]) -> list[Finding]:
     """The findings of `rules` in `module`, less what is suppressed, in order."""
-    active = [rule for rule in rules if rule.scope is None or rule.scope in module.scopes]
+    active = [
+        rule
+        for rule in rules
+        if (rule.scope is None or rule.scope in module.scopes)
+        and rule.exempt_scope not in module.scopes
+    ]
     found: set[Finding] = set()
     dispatch: dict[type[ast.AST], list[Rule]] = {}
     for rule in active:

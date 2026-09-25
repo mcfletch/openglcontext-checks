@@ -29,3 +29,6 @@ compatibility promise.
 - OGC222 follows a test's calls to helpers defined in its own module, so a
   test whose assertion is in `_close(found, wanted)` or `self._is_inverse(m)`
   is not reported.
+- The `script` scope, for a project's programs run by path, which OGC161
+  does not run on; a rule declares a scope it does not run in as
+  `exempt_scope`. A scope's glob with a leading `!` takes paths out of it.
