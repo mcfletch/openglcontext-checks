@@ -30,6 +30,13 @@ Keys:
   (OGC101, OGC102, OGC111, OGC121, OGC151). They replace the rule's default,
   which names OpenGLContext's API; a rule's docstring says what it does with
   them.
+- `checked-types`: the qualified names of the project's own checked types,
+  which the mypy plugin (`openglcontext_checks.mypy_plugin`) refuses to see
+  made or subclassed outside the module defining them. Added to
+  OpenGLContext's own, which are refused everywhere.
+- `contained-paths`: the qualified names of the checked types that are paths
+  a module in the `loader` scope may open. Added to OpenGLContext's
+  `ContainedPath`.
 
 An unknown key, an unknown code or scope, or a value of the wrong type is a
 `ConfigError`.
@@ -81,7 +88,17 @@ KNOWN_SCOPES = frozenset(
 )
 
 _KEYS = frozenset(
-    {'paths', 'select', 'ignore', 'exclude', 'per-file-ignores', 'scopes', 'sanctioned'}
+    {
+        'paths',
+        'select',
+        'ignore',
+        'exclude',
+        'per-file-ignores',
+        'scopes',
+        'sanctioned',
+        'checked-types',
+        'contained-paths',
+    }
 )
 
 
@@ -105,6 +122,10 @@ class Config:
     scopes: tuple[tuple[str, tuple[str, ...]], ...] = tuple(DEFAULT_SCOPES.items())
     #: Rule code to the project's own sanctioned names, for the rules it names.
     sanctioned: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    #: The project's own checked types, for the mypy plugin.
+    checked_types: tuple[str, ...] = ()
+    #: The project's own checked path types, for the mypy plugin.
+    contained_paths: tuple[str, ...] = ()
 
     @property
     def selected(self) -> tuple[str, ...]:
@@ -242,6 +263,8 @@ def _from_table(table: object, root: str, source: str) -> Config:
             (code, _sanctioned(code, names))
             for code, names in sorted(_table(table.get('sanctioned', {}), 'sanctioned'))
         )
+        checked_types = _class_names(table.get('checked-types', []), 'checked-types')
+        contained_paths = _class_names(table.get('contained-paths', []), 'contained-paths')
     except ConfigError as error:
         raise ConfigError('%s: %s' % (where, error)) from None
     return Config(
@@ -254,6 +277,8 @@ def _from_table(table: object, root: str, source: str) -> Config:
         per_file_ignores=per_file,
         scopes=tuple(scopes.items()),
         sanctioned=sanctioned,
+        checked_types=checked_types,
+        contained_paths=contained_paths,
     )
 
 
@@ -271,6 +296,16 @@ def _sanctioned(code: str, names: object) -> tuple[str, ...]:
         if not all(part.isidentifier() for part in name.split('.')):
             raise ConfigError('%s: %r is not a dotted name' % (where, name))
     return tuple(chosen)
+
+
+def _class_names(value: object, where: str) -> tuple[str, ...]:
+    """The qualified class names `value` lists: a module and a class at least."""
+    names = _strings(value, where)
+    for name in names:
+        parts = name.split('.')
+        if len(parts) < 2 or not all(part.isidentifier() for part in parts):
+            raise ConfigError('%s: %r is not a dotted name' % (where, name))
+    return tuple(names)
 
 
 def _strings(value: object, name: str) -> list[str]:

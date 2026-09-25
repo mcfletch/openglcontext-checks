@@ -167,6 +167,23 @@ def test_a_rule_that_points_at_no_api_takes_no_sanctioned_names(tmp_path):
         load_config(str(tmp_path))
 
 
+def test_a_project_names_its_own_checked_types_for_the_mypy_plugin(tmp_path):
+    _project(tmp_path, '[project]\nname = "x"\n')
+    config = load_config(str(tmp_path))
+    assert (config.checked_types, config.contained_paths) == ((), ())
+    _project(
+        tmp_path,
+        """
+        [tool.openglcontext-checks]
+        checked-types = ["game.tokens.Token"]
+        contained-paths = ["game.files.Contained"]
+        """,
+    )
+    config = load_config(str(tmp_path))
+    assert config.checked_types == ('game.tokens.Token',)
+    assert config.contained_paths == ('game.files.Contained',)
+
+
 def test_the_loader_and_pass_scopes_are_empty_until_a_project_names_them(tmp_path):
     _project(tmp_path, '[project]\nname = "x"\n')
     config = load_config(str(tmp_path))
@@ -203,6 +220,9 @@ def test_the_loader_and_pass_scopes_are_empty_until_a_project_names_them(tmp_pat
         ('sanctioned = { OGC121 = "x.y" }', 'sanctioned.OGC121 must be a list of strings'),
         ('sanctioned = { OGC121 = [] }', 'sanctioned.OGC121 must name at least one'),
         ('sanctioned = { OGC121 = ["x y"] }', "sanctioned.OGC121: 'x y' is not a dotted name"),
+        ('checked-types = "x.Y"', 'checked-types must be a list of strings'),
+        ('checked-types = ["x..Y"]', "checked-types: 'x..Y' is not a dotted name"),
+        ('contained-paths = ["Y"]', "contained-paths: 'Y' is not a dotted name"),
     ],
 )
 def test_a_bad_table_is_a_configuration_error_naming_the_fault(tmp_path, table, complaint):

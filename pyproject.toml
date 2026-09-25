@@ -43,6 +43,8 @@ dependencies = [
 test = [
     "pytest>=7.3",
     "coverage[toml]>=7",
+    # The mypy plugin is tested by running mypy over small projects.
+    "mypy>=1.10",
 ]
 dev = [
     "openglcontext-checks[test]",

@@ -9,6 +9,12 @@ compatibility promise.
 
 ### Added
 
+- A mypy plugin, `openglcontext_checks.mypy_plugin`: a checked type made or
+  subclassed outside the module defining it is an error
+  (`checked-construction`), and in the `loader` scope a file opened at a path
+  whose type is not a contained path is an error (`unchecked-open`).
+  OpenGLContext's checked types are refused in every project; the
+  `checked-types` and `contained-paths` keys add a project's own.
 - The rules OGC131 (`id()` as a key), OGC141 (GL call in `__del__`), OGC161
   (configuration or I/O at import), OGC201 (suppression without a reason),
   and, in the `test` scope, OGC221 (skip inside an `except`), OGC222 (test

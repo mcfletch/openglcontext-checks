@@ -72,6 +72,15 @@ pass = ["src/game/render/**"]         # modules that draw: OGC151
 OGC121 = ["game.files.staged_file", "game.files.staged_directory"]
 ```
 
+Two more keys are read by the mypy plugin only (see [Checked types, in
+mypy](#checked-types-in-mypy)):
+
+```toml
+[tool.openglcontext-checks]
+checked-types = ["game.levels.LevelKey"]      # made only in the module defining them
+contained-paths = ["game.levels.LevelPath"]   # paths a loader-scope module may open
+```
+
 A path is in a scope when it matches one of the scope's globs and none of
 the globs written with a leading `!`. The `test` scope, which OGC221 to
 OGC223 run in, defaults to `tests/**`, `**/test_*.py`, `**/*_test.py` and
@@ -408,6 +417,46 @@ def test_teardown():
     except Exception:                   # OGC223
         pass
 ```
+
+## Checked types, in mypy
+
+A checked type is a value whose type says a check has been made: a path held
+to the directory of the document that named it, a URL put to a redirect
+policy, the handle of the GL context that is current. Its constructor is
+private to the module that makes the check, and the functions below that
+module take only the checked type, so a value that has not been through the
+check does not type-check where one is needed. mypy on its own accepts a
+construction written anywhere; the plugin in this package reports one:
+
+```toml
+[tool.mypy]
+plugins = ["openglcontext_checks.mypy_plugin"]
+```
+
+It reports, with the error code `checked-construction`, a checked type made
+(`ContainedPath(name)`) or subclassed outside its home module, the module
+defining the class. OpenGLContext's checked types (`ContainedPath` and
+`CheckedURL` in `OpenGLContext.loaders.resolver`, `ContextKey` in
+`OpenGLContext.contextresources`) are reported in every project; a project
+adds its own as `checked-types`.
+
+In a module of the `loader` scope it also reports, with the error code
+`unchecked-open`, a file opened at a path whose type is not a contained path:
+`open`, `io.open`, `codecs.open`, `gzip`, `bz2` and `lzma`'s `open`,
+`tarfile.open`, `zipfile.ZipFile`, `PIL.Image.open`, `numpy.load` and
+`numpy.fromfile` handed a `str`, `bytes`, a `pathlib.Path` or a value typed
+`Any`. A string literal, a `Literal` type, a file descriptor and an open file
+are accepted. OpenGLContext's `ContainedPath` is a contained path; a project
+adds its own as `contained-paths`. This is OGC111 by type rather than by
+syntax: OGC111 reports a path the function builds from a name, and the plugin
+reports every path whose type does not say where it came from, parameters
+and attributes included.
+
+The settings are read from the `pyproject.toml` beside mypy's configuration
+file, or in the directory mypy runs in when it has none, and are part of each
+module's entry in mypy's cache, so a changed scope checks the module again.
+Where mypy has a hook of its own for one of these calls, that hook still
+gives the call's type. `typing.cast` to a checked type is not reported.
 
 ## Development
 
