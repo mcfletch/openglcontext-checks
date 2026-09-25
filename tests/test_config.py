@@ -4,6 +4,7 @@ import textwrap
 
 import pytest
 
+import openglcontext_checks.config as config_module
 from openglcontext_checks.config import ConfigError, load_config
 from openglcontext_checks.rules import RULES
 
@@ -52,8 +53,6 @@ def test_a_project_inside_another_does_not_take_the_outer_table(tmp_path):
 
 
 def test_with_no_pyproject_anywhere_the_start_is_the_root(tmp_path, monkeypatch):
-    import openglcontext_checks.config as config_module
-
     monkeypatch.setattr(config_module, '_parents', lambda start: [start])
     config = load_config(str(tmp_path))
     assert config.root == str(tmp_path)

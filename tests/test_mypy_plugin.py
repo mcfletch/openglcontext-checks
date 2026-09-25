@@ -7,10 +7,15 @@ asserted is what mypy reports to a user.
 
 import os
 import textwrap
+from types import SimpleNamespace
 
 import pytest
 
 api = pytest.importorskip('mypy.api', reason='the mypy plugin is tested by running mypy')
+
+from mypy.options import Options  # noqa: E402 mypy is optional: imported after the skip
+
+from openglcontext_checks.mypy_plugin import CheckedTypesPlugin  # noqa: E402 imports mypy
 
 HOME = """
 class Token(str):
@@ -252,12 +257,6 @@ def test_a_changed_scope_is_checked_again_rather_than_answered_from_the_cache(pr
 
 
 def test_a_signature_hook_mypy_has_for_an_opener_still_gives_the_signature(tmp_path, monkeypatch):
-    from types import SimpleNamespace
-
-    from mypy.options import Options
-
-    from openglcontext_checks.mypy_plugin import CheckedTypesPlugin
-
     (tmp_path / 'pyproject.toml').write_text('[project]\nname = "x"\n', encoding='utf-8')
     monkeypatch.chdir(tmp_path)
     assert CheckedTypesPlugin(Options()).get_function_signature_hook('builtins.len') is None
