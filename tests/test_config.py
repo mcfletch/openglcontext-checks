@@ -69,7 +69,10 @@ def test_select_ignore_and_prefixes_decide_the_codes(tmp_path):
         ignore = ["OGC161"]
         """,
     )
-    assert load_config(str(tmp_path)).selected == ('OGC131', 'OGC141', 'OGC201')
+    first_hundred = {code for code in EVERY_CODE if code.startswith('OGC1')}
+    assert load_config(str(tmp_path)).selected == tuple(
+        sorted(first_hundred - {'OGC161'} | {'OGC201'})
+    )
 
 
 def test_per_file_ignores_apply_to_the_paths_they_name(tmp_path):
@@ -121,17 +124,64 @@ def test_command_line_codes_replace_select_and_add_to_ignore(tmp_path):
     config = load_config(str(tmp_path))
     narrowed = config.with_overrides(select=['OGC131', 'OGC141', 'OGC161'], ignore=['OGC141'])
     assert narrowed.selected == ('OGC161',)
-    assert config.with_overrides(select=None, ignore=['OGC2']).selected == (
-        'OGC141',
-        'OGC161',
+    assert config.with_overrides(select=None, ignore=['OGC2']).selected == tuple(
+        sorted(code for code in EVERY_CODE if not code.startswith('OGC2') and code != 'OGC131')
     )
 
 
 def test_the_settings_of_a_file_say_what_decides_its_findings(tmp_path):
     _project(tmp_path, '[tool.openglcontext-checks]\nselect = ["OGC131", "OGC222"]\n')
     config = load_config(str(tmp_path))
-    assert config.settings_for('src/a.py') == 'OGC131,OGC222|'
-    assert config.settings_for('tests/test_a.py') == 'OGC131,OGC222|test'
+    assert config.settings_for('src/a.py') == 'OGC131,OGC222||'
+    assert config.settings_for('tests/test_a.py') == 'OGC131,OGC222|test|'
+
+
+def test_the_sanctioned_names_are_among_the_settings_of_every_file(tmp_path):
+    _project(
+        tmp_path,
+        """
+        [tool.openglcontext-checks.sanctioned]
+        OGC121 = ["game.files.staged", "game.files.replace"]
+        """,
+    )
+    config = load_config(str(tmp_path))
+    assert config.settings_for('src/a.py').endswith('|OGC121=game.files.staged,game.files.replace')
+
+
+def test_a_project_names_its_own_sanctioned_api_for_a_rule(tmp_path):
+    _project(
+        tmp_path,
+        """
+        [tool.openglcontext-checks.sanctioned]
+        OGC121 = ["game.files.staged"]
+        """,
+    )
+    assert load_config(str(tmp_path)).sanctioned == (('OGC121', ('game.files.staged',)),)
+    _project(tmp_path, '[project]\nname = "x"\n')
+    assert load_config(str(tmp_path)).sanctioned == ()
+
+
+def test_a_rule_that_points_at_no_api_takes_no_sanctioned_names(tmp_path):
+    _project(tmp_path, '[tool.openglcontext-checks.sanctioned]\nOGC131 = ["x.y"]\n')
+    with pytest.raises(ConfigError, match='OGC131 points at no sanctioned API'):
+        load_config(str(tmp_path))
+
+
+def test_the_loader_and_pass_scopes_are_empty_until_a_project_names_them(tmp_path):
+    _project(tmp_path, '[project]\nname = "x"\n')
+    config = load_config(str(tmp_path))
+    assert config.scopes_for('pkg/loaders/gltf.py') == frozenset()
+    _project(
+        tmp_path,
+        """
+        [tool.openglcontext-checks.scopes]
+        loader = ["pkg/loaders/**"]
+        pass = ["pkg/passes/**"]
+        """,
+    )
+    config = load_config(str(tmp_path))
+    assert config.scopes_for('pkg/loaders/gltf.py') == frozenset({'loader'})
+    assert config.scopes_for('pkg/passes/flat.py') == frozenset({'pass'})
 
 
 @pytest.mark.parametrize(
@@ -148,6 +198,11 @@ def test_the_settings_of_a_file_say_what_decides_its_findings(tmp_path):
         ('per-file-ignores = { "x.py" = ["OGC000"] }', 'per-file-ignores: unknown rule code'),
         ('scopes = { tset = ["tests/**"] }', "scopes: unknown scope 'tset'"),
         ('scopes = { test = "tests/**" }', 'scopes.test must be a list of strings'),
+        ('sanctioned = ["x.y"]', 'sanctioned must be a table'),
+        ('sanctioned = { OGC999 = ["x.y"] }', "sanctioned: unknown rule code 'OGC999'"),
+        ('sanctioned = { OGC121 = "x.y" }', 'sanctioned.OGC121 must be a list of strings'),
+        ('sanctioned = { OGC121 = [] }', 'sanctioned.OGC121 must name at least one'),
+        ('sanctioned = { OGC121 = ["x y"] }', "sanctioned.OGC121: 'x y' is not a dotted name"),
     ],
 )
 def test_a_bad_table_is_a_configuration_error_naming_the_fault(tmp_path, table, complaint):

@@ -22,6 +22,14 @@ Keys:
   `**/test_*.py`, `**/*_test.py` and `**/conftest.py`. The `script` scope,
   the programs run by path whose module level is their start-up and which
   OGC161 does not run on, is empty unless the project names its programs.
+  The `loader` scope (the modules that read values and file names out of a
+  document) and the `pass` scope (the modules that draw) are empty unless
+  the project names them.
+- `sanctioned`: a table of rule code to the qualified names of the project's
+  own API for what that rule reports, for the rules that point at one
+  (OGC101, OGC102, OGC111, OGC121, OGC151). They replace the rule's default,
+  which names OpenGLContext's API; a rule's docstring says what it does with
+  them.
 
 An unknown key, an unknown code or scope, or a value of the wrong type is a
 `ConfigError`.
@@ -63,6 +71,8 @@ DEFAULT_EXCLUDE = (
 DEFAULT_SCOPES: Mapping[str, tuple[str, ...]] = {
     'test': ('tests/**', '**/test_*.py', '**/*_test.py', '**/conftest.py'),
     'script': (),
+    'loader': (),
+    'pass': (),
 }
 
 #: Every scope some rule runs in, or does not run in.
@@ -70,7 +80,9 @@ KNOWN_SCOPES = frozenset(
     scope for rule in ALL_RULES for scope in (rule.scope, rule.exempt_scope) if scope
 )
 
-_KEYS = frozenset({'paths', 'select', 'ignore', 'exclude', 'per-file-ignores', 'scopes'})
+_KEYS = frozenset(
+    {'paths', 'select', 'ignore', 'exclude', 'per-file-ignores', 'scopes', 'sanctioned'}
+)
 
 
 class ConfigError(Exception):
@@ -91,6 +103,8 @@ class Config:
     exclude: tuple[str, ...] = ()
     per_file_ignores: tuple[tuple[str, frozenset[str]], ...] = ()
     scopes: tuple[tuple[str, tuple[str, ...]], ...] = tuple(DEFAULT_SCOPES.items())
+    #: Rule code to the project's own sanctioned names, for the rules it names.
+    sanctioned: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     @property
     def selected(self) -> tuple[str, ...]:
@@ -138,9 +152,10 @@ class Config:
 
     def settings_for(self, path: str) -> str:
         """Everything in the configuration that decides `path`'s findings, as text."""
-        return '%s|%s' % (
+        return '%s|%s|%s' % (
             ','.join(sorted(self.codes_for(path))),
             ','.join(sorted(self.scopes_for(path))),
+            ';'.join('%s=%s' % (code, ','.join(names)) for code, names in self.sanctioned),
         )
 
     def with_overrides(self, *, select: Sequence[str] | None, ignore: Sequence[str]) -> Config:
@@ -223,6 +238,10 @@ def _from_table(table: object, root: str, source: str) -> Config:
                     'scopes: unknown scope %r (known: %s)' % (name, ', '.join(sorted(KNOWN_SCOPES)))
                 )
             scopes[name] = tuple(_strings(patterns, 'scopes.' + name))
+        sanctioned = tuple(
+            (code, _sanctioned(code, names))
+            for code, names in sorted(_table(table.get('sanctioned', {}), 'sanctioned'))
+        )
     except ConfigError as error:
         raise ConfigError('%s: %s' % (where, error)) from None
     return Config(
@@ -234,7 +253,24 @@ def _from_table(table: object, root: str, source: str) -> Config:
         exclude=exclude,
         per_file_ignores=per_file,
         scopes=tuple(scopes.items()),
+        sanctioned=sanctioned,
     )
+
+
+def _sanctioned(code: str, names: object) -> tuple[str, ...]:
+    """The qualified names a project gives rule `code` as its sanctioned API."""
+    if code not in RULES:
+        raise ConfigError('sanctioned: unknown rule code %r' % (code,))
+    if RULES[code].sanctioned is None:
+        raise ConfigError('sanctioned: %s points at no sanctioned API' % (code,))
+    where = 'sanctioned.' + code
+    chosen = _strings(names, where)
+    if not chosen:
+        raise ConfigError('%s must name at least one qualified name' % (where,))
+    for name in chosen:
+        if not all(part.isidentifier() for part in name.split('.')):
+            raise ConfigError('%s: %r is not a dotted name' % (where, name))
+    return tuple(chosen)
 
 
 def _strings(value: object, name: str) -> list[str]:

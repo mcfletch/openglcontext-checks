@@ -11,6 +11,11 @@ of a type named in `nodes`, from one walk of the tree shared by every rule;
 than nodes (the comments, say). A rule with a `scope` runs only on modules the
 configuration places in that scope, and a rule with an `exempt_scope` runs on
 every module but those.
+
+A rule that reports a raw form with one sanctioned replacement names that
+replacement in `sanctioned`, by qualified name: OpenGLContext's API, which a
+project replaces with its own through the `sanctioned` configuration key.
+`sanctioned_names` answers the names in force for a module.
 """
 
 from __future__ import annotations
@@ -51,6 +56,9 @@ class Rule:
     exempt_scope: ClassVar[str | None] = None
     #: The node types `visit` is handed.
     nodes: ClassVar[tuple[type[ast.AST], ...]] = ()
+    #: The API this rule's findings point at, by qualified name, where the
+    #: project names none of its own; None for a rule that points at none.
+    sanctioned: ClassVar[tuple[str, ...] | None] = None
     VALID: ClassVar[tuple[str, ...]] = ()
     INVALID: ClassVar[tuple[Invalid, ...]] = ()
 
@@ -61,6 +69,10 @@ class Rule:
     def check_module(self, module: Module) -> Iterator[Finding]:  # noqa: ARG002 the base reports nothing
         """Findings for the module as a whole."""
         yield from ()
+
+    def sanctioned_names(self, module: Module) -> tuple[str, ...]:
+        """The sanctioned API in force for `module`: the project's, else the default."""
+        return module.sanctioned.get(self.code, self.sanctioned or ())
 
     def finding(self, where: ast.AST | int, message: str) -> Finding:
         """A finding of this rule at a node, or at the start of a line."""

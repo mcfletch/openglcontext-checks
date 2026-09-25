@@ -7,8 +7,8 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 from ..findings import Finding
-from ..symbols import UNBOUND
 from .base import Invalid, Rule, snippet
+from .gl import gl_function
 
 if TYPE_CHECKING:
     from ..engine import Module
@@ -81,6 +81,24 @@ class GlInDel(Rule):
                 def __del__(self):
                     glDeleteEverything()
         """),
+        snippet("""
+            from OpenGL.GL import glDeleteLists
+
+            def forget(name):
+                PENDING.append(name)
+
+            class Lists:
+                def __del__(self, release=forget):
+                    release(self.list)
+        """),
+        snippet("""
+            from OpenGL.GL import glDeleteLists
+
+            class Lists:
+                def __del__(self, glDeleteLists=glDeleteLists):
+                    glDeleteLists = PENDING.append
+                    glDeleteLists(self.list)
+        """),
     )
     INVALID = (
         Invalid(
@@ -127,6 +145,27 @@ class GlInDel(Rule):
             """),
             (7, 8, 9),
         ),
+        Invalid(
+            snippet("""
+                from OpenGL.GL import glDeleteLists
+
+                class Lists:
+                    def __del__(self, glDeleteLists=glDeleteLists):
+                        glDeleteLists(self.list, 1)
+            """),
+            (5,),
+        ),
+        Invalid(
+            snippet("""
+                from OpenGL.GL import *
+
+                class Lists:
+                    def __del__(self, delete=glDeleteLists, *, finish=glFinish):
+                        delete(self.list, 1)
+                        finish()
+            """),
+            (5, 6),
+        ),
     )
 
     def visit(self, node: ast.AST, module: Module) -> Iterator[Finding]:
@@ -135,16 +174,7 @@ class GlInDel(Rule):
         function = symbols.enclosing_function(node)
         if not isinstance(function, ast.FunctionDef) or function.name != '__del__':
             return
-        qualified = symbols.qualified_name(node.func)
-        if qualified is not None:
-            if not _is_gl_module(qualified.rpartition('.')[0]):
-                return
-        elif not (
-            isinstance(node.func, ast.Name)
-            and _looks_like_gl(node.func.id)
-            and symbols.lookup(node.func).kind == UNBOUND
-            and any(_is_gl_module(star) for star in symbols.star_modules(node))
-        ):
+        if gl_function(node, symbols) is None:
             return
         yield self.finding(
             node,
@@ -152,20 +182,3 @@ class GlInDel(Rule):
             'with whatever context is current there or none; queue the release for the owning '
             'context (a disposal chain) instead' % (ast.unparse(node.func),),
         )
-
-
-def _is_gl_module(name: str) -> bool:
-    """Whether `name` is OpenGL.GL, an OpenGL.GLES* module, a raw one, or inside one."""
-    parts = name.split('.')
-    if parts[0] != 'OpenGL' or len(parts) < 2:
-        return False
-    if parts[1] == 'raw':
-        parts = parts[1:]
-        if len(parts) < 2:
-            return False
-    return parts[1] == 'GL' or parts[1].startswith('GLES')
-
-
-def _looks_like_gl(name: str) -> bool:
-    """Whether `name` is spelled as a GL entry point: `gl` and a capital or digit."""
-    return len(name) > 2 and name.startswith('gl') and (name[2].isupper() or name[2].isdigit())

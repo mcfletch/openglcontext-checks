@@ -51,6 +51,17 @@ class FirstLineOutsideScripts(Rule):
         yield self.finding(1, 'not a script')
 
 
+class NamesItsApi(Rule):
+    """A module-level rule whose message names the API it points at."""
+
+    code = 'OGC905'
+    name = 'points at an API'
+    sanctioned = ('engine.files.staged',)
+
+    def check_module(self, module):
+        yield self.finding(1, 'use %s' % (' or '.join(self.sanctioned_names(module)),))
+
+
 RULES = [NamesCalledEval(), FirstLineInScope(), Silent()]
 
 
@@ -74,6 +85,18 @@ def test_a_rule_does_not_run_in_the_scope_it_is_exempt_from():
     assert [finding.code for finding in run_rules(module, rules)] == ['OGC904']
     module = parse_module(b'x = 1\n', 'example.py', frozenset({'test', 'script'}))
     assert run_rules(module, rules) == []
+
+
+def test_a_rule_names_its_default_api_unless_the_project_names_its_own():
+    rules = [NamesItsApi()]
+    module = parse_module(b'x = 1\n', 'example.py')
+    assert [finding.message for finding in run_rules(module, rules)] == ['use engine.files.staged']
+    module = parse_module(
+        b'x = 1\n', 'example.py', sanctioned={'OGC905': ('game.save', 'game.stage')}
+    )
+    assert [finding.message for finding in run_rules(module, rules)] == [
+        'use game.save or game.stage'
+    ]
 
 
 def test_findings_come_back_in_source_order():

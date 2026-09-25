@@ -43,3 +43,11 @@ compatibility promise.
 - OGC201 reports text written straight after a `# type: ignore`'s codes,
   which mypy rejects as an invalid comment; a type-ignore's reason goes in a
   comment of its own after it.
+- The rules OGC101 (bare conversion of a document value), OGC102 (decode
+  before a size check) and OGC111 (raw opener on an unconfined path), in the
+  new `loader` scope; OGC121 (file written in place), outside the `test`
+  scope; and OGC151 (GL state change not restored), in the new `pass`
+  scope. The `loader` and `pass` scopes are empty until a project names
+  them.
+- The `sanctioned` configuration key: a project's own API for the rules that
+  point at one, by rule code and qualified name, in place of OpenGLContext's.

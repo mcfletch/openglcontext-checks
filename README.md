@@ -1,9 +1,10 @@
 # openglcontext-checks
 
 Static checks for defect classes found repeatedly in reviews of the
-OpenGLContext stack: identity-keyed caches, GL calls from finalisers,
-configuration read at import, suppressions with no reason, and tests that
-cannot fail. Each rule has a stable code, `OGC` and three digits, and decides
+OpenGLContext stack: document values used unchecked, files opened at paths a
+document chose, files written in place, GL state left changed when a draw
+raises, identity-keyed caches, GL calls from finalisers, configuration read
+at import, suppressions with no reason, and tests that cannot fail. Each rule has a stable code, `OGC` and three digits, and decides
 from a module's syntax tree, what its names are bound to, and its comment
 tokens. The package needs nothing beyond the standard library (and `tomli` on
 Python 3.10), so a project installs it without the engine.
@@ -64,6 +65,11 @@ exclude = ["src/generated"]           # not checked, beyond the defaults below
 [tool.openglcontext-checks.scopes]
 test = ["tests/**", "**/test_*.py"]   # the modules the test rules run on
 script = ["tools/*.py", "!tools/_*.py"]  # programs run by path; not OGC161
+loader = ["src/game/levels/**"]       # modules reading documents: OGC101, OGC102, OGC111
+pass = ["src/game/render/**"]         # modules that draw: OGC151
+
+[tool.openglcontext-checks.sanctioned]
+OGC121 = ["game.files.staged_file", "game.files.staged_directory"]
 ```
 
 A path is in a scope when it matches one of the scope's globs and none of
@@ -71,9 +77,23 @@ the globs written with a leading `!`. The `test` scope, which OGC221 to
 OGC223 run in, defaults to `tests/**`, `**/test_*.py`, `**/*_test.py` and
 `**/conftest.py`. The `script` scope is empty unless a project names its
 programs: files run by path, whose module level is their start-up, which
-OGC161 does not run on. An unknown key, an
-unknown rule code or scope, or a value of the wrong type is a configuration
-error, and the run exits 2 naming it.
+OGC161 does not run on. The `loader` scope (the modules that read values and
+file names out of a document: model and level loaders, the handlers a
+document's extensions name) and the `pass` scope (the modules that draw) are
+empty until a project names them, so OGC101, OGC102, OGC111 and OGC151 report
+nothing in a project that has not. An unknown key, an unknown rule code or
+scope, or a value of the wrong type is a configuration error, and the run
+exits 2 naming it.
+
+OGC101, OGC102, OGC111, OGC121 and OGC151 report a raw form that has one
+sanctioned replacement, and their messages name it. By default that is
+OpenGLContext's API; a project with its own names it under `sanctioned`, by
+qualified name, and the rule uses those instead. For OGC102 the names are the
+size checks that count as a check, for OGC121 the staging calls whose
+directory or file may be written, and for OGC151 the context managers that
+restore state; for OGC101 and OGC111 they appear in the message only. The
+module that implements the sanctioned API does what the rule reports, and a
+`per-file-ignores` entry exempts it.
 
 Globs are matched against the path relative to the project root, written
 with `/`. A glob with no `/` matches any one component, so `build` matches a
@@ -115,7 +135,8 @@ ruff's RUF100 (unused `noqa`) tells ruff the codes are another tool's with
 Each project keeps the findings of its last run in `.oglc-check-cache/` in the
 project root. An entry is keyed on the file's bytes, this package's own source
 (so an edited rule in an editable install counts, not only a new version),
-and the codes and scopes that apply to the file, so editing the file, changing
+the codes and scopes that apply to the file and the project's sanctioned
+names, so editing the file, changing
 the package or changing the configuration each make it miss. An
 unchanged file is not parsed again, and its stored findings are reported as
 before. The cache file is replaced whole, through a temporary file and one
@@ -139,6 +160,83 @@ declares no `pytest11` entry point, so installing it changes no suite that has
 not asked for the items.
 
 ## The rules
+
+### OGC101: bare conversion of a document value, in loaders
+
+A call to the builtin `float`, `int` or `bool` whose first argument is a
+subscript by a string literal (`extras['depth']`) or a `get` call with a
+string literal first (`params.get('count', 0)`), in the `loader` scope. A
+misspelt value raises and aborts the load, `1e999` and `nan` pass `float`,
+a count of four billion passes `int`, and `bool('false')` is true. An index
+by a number or a variable (`shape[0]`, `values[key]`) is not reported. Read
+the value through a reader that checks it, reports it once and answers a
+default: `OpenGLContext.loaders.documentvalues.DocumentValues`.
+
+```python
+rate = float(extras['rate'])                                   # OGC101
+rate = values.number(extras.get('rate'), 1.0, 'emitter rate', minimum=0.0)  # not reported
+```
+
+### OGC102: decode before a size check, in loaders
+
+In the `loader` scope: a decoder (`base64`'s decoders,
+`binascii.a2b_base64`, the `decompress` of `zlib`, `gzip`, `bz2` and
+`lzma`, `DracoPy.decode`) handed a parameter or local of the function, or a
+`numpy.frombuffer` count or offset, or a `numpy.empty`, `zeros`, `ones` or
+`full` shape, that reads a document's named field -- where nothing earlier in
+the function compares one of the names the value is made of, or hands one to
+a sanctioned size check (`OpenGLContext.loaders.resolver.check_size`,
+`check_pixels`). A document naming gigabytes allocates them before anything
+refuses it.
+
+```python
+data = base64.b64decode(payload)                  # OGC102
+
+check_size(len(payload) * 3 // 4, most, 'data: URI')
+data = base64.b64decode(payload)                  # not reported
+```
+
+### OGC111: raw opener on an unconfined path, in loaders
+
+In the `loader` scope: `open`, `io.open`, `codecs.open`, the `open` of
+`gzip`, `bz2` and `lzma`, `tarfile.open`, `zipfile.ZipFile`,
+`PIL.Image.open`, `numpy.load` or `numpy.fromfile` handed a path the same
+function joins (`os.path.join`, a path class of several parts, `+`, `/`,
+`%` or `str.format` on a literal template, an f-string) from a part after
+the first that the source does not fix, or a path read from a document's
+named field. A local name is followed through everything the function
+assigns it. A part is fixed when it is a literal, a name of the module, or a
+local assigned only fixed values; a parameter, an attribute or another
+call's result opened as it is is not reported. Resolve the name against the
+document's base, which refuses one that leads outside it:
+`OpenGLContext.loaders.resolver.Resolver.resolve`,
+`OpenGLContext.loaders.tiles3d.fetch.beside`.
+
+```python
+card = Image.open(os.path.join(directory, species['card']))    # OGC111
+card = Image.open(fetch.local_copy(fetch.beside(directory, species['card'])))  # not reported
+```
+
+### OGC121: file written in place
+
+`open`, `io.open`, `codecs.open`, the `open` of `gzip`, `bz2` and `lzma`,
+`tarfile.open` or `zipfile.ZipFile` with a literal mode that writes (`w`,
+`a`, `x`, `+`); `shutil.copy`, `copy2`, `copyfile` or `copytree` to a
+destination; and `write_text` or `write_bytes` on anything that is not an
+imported module. Not run in the `test` scope. A write cut short leaves part
+of the file, which the next run takes for the whole. Not reported: a write
+under a directory or to a file that a sanctioned staging call
+(`OpenGLContext.atomicfiles.staged_file`, `staged_directory`) or
+`tempfile.mkdtemp`, `mkstemp` or `TemporaryDirectory` made, and a write to a
+name the same function moves into place with `os.replace` or `os.rename`.
+
+```python
+with open(path, 'w') as handle:                   # OGC121
+    json.dump(record, handle)
+
+with atomicfiles.staged_file(path, 'w') as handle:   # not reported
+    json.dump(record, handle)
+```
 
 ### OGC131: `id()` as a key
 
@@ -187,6 +285,30 @@ class Texture:
 class QueuedTexture:
     def __del__(self):
         PENDING_RELEASES.append(self.name)   # not reported
+```
+
+### OGC151: GL state change not restored, in passes
+
+In the `pass` scope: `glEnable`, `glDisable`, `glBindFramebuffer`,
+`glScissor`, `glUseProgram` or `glCullFace`, from `OpenGL.GL` or a GLES
+module, unless a `try` in the same function restores it in its `finally`
+(the same call again; `glEnable` and `glDisable` of the same capability;
+disabling the scissor test for `glScissor`) and either holds the change in
+its body or handlers or follows it in the same block or one around it. A
+call in a `finally` is a restore itself, and one inside a `with` of a
+sanctioned state manager is restored by it. A draw that raises part way
+leaves the state it set for the next view, pass or frame.
+
+```python
+glEnable(GL_SCISSOR_TEST)                         # OGC151
+scene.render(view)
+glDisable(GL_SCISSOR_TEST)                        # OGC151
+
+glEnable(GL_SCISSOR_TEST)                         # not reported
+try:
+    scene.render(view)
+finally:
+    glDisable(GL_SCISSOR_TEST)
 ```
 
 ### OGC161: configuration or I/O at import

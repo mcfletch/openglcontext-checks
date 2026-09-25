@@ -12,7 +12,7 @@ import ast
 import dataclasses
 import tokenize
 import warnings
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from .findings import Finding
 from .pragmas import Pragma, read_pragmas
@@ -45,9 +45,16 @@ class Module:
     pragmas: tuple[Pragma, ...]
     #: The configured scopes this module is in (`test`, ...).
     scopes: frozenset[str]
+    #: Rule code to the project's own sanctioned names, where it names any.
+    sanctioned: Mapping[str, tuple[str, ...]] = dataclasses.field(default_factory=dict)
 
 
-def parse_module(source: bytes, path: str, scopes: frozenset[str] = frozenset()) -> Module:
+def parse_module(
+    source: bytes,
+    path: str,
+    scopes: frozenset[str] = frozenset(),
+    sanctioned: Mapping[str, tuple[str, ...]] | None = None,
+) -> Module:
     """`source` parsed for the rules; raises `ParseError`."""
     try:
         with warnings.catch_warnings():
@@ -63,7 +70,7 @@ def parse_module(source: bytes, path: str, scopes: frozenset[str] = frozenset())
         column = getattr(error, 'offset', None) or 1
         message = getattr(error, 'msg', None) or str(error)
         raise ParseError(path, line, column, message) from error
-    return Module(path, tree, Symbols(tree), tuple(pragmas), scopes)
+    return Module(path, tree, Symbols(tree), tuple(pragmas), scopes, dict(sanctioned or {}))
 
 
 def run_rules(module: Module, rules: Sequence[Rule]) -> list[Finding]:
@@ -100,9 +107,10 @@ def check_source(
     *,
     codes: Iterable[str] | None = None,
     scopes: Iterable[str] = (),
+    sanctioned: Mapping[str, tuple[str, ...]] | None = None,
 ) -> list[Finding]:
     """The findings of the rules `codes` (default every rule) in `source`."""
     data = source.encode('utf-8') if isinstance(source, str) else source
     wanted = None if codes is None else set(codes)
     rules = [rule for rule in ALL_RULES if wanted is None or rule.code in wanted]
-    return run_rules(parse_module(data, path, frozenset(scopes)), rules)
+    return run_rules(parse_module(data, path, frozenset(scopes), sanctioned), rules)

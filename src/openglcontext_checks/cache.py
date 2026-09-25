@@ -5,7 +5,8 @@ root, maps each checked file's project-relative path to a key and the findings
 reported for it. The key is a hash of the file's bytes, of this package's own
 source (which is what decides the findings, and changes in an editable install
 without a new version number) and of the settings that decide the file's
-findings (the codes that run on it and the scopes it is in), so an edit to the
+findings (the codes that run on it, the scopes it is in and the project's
+sanctioned names), so an edit to the
 file, to the rules or to the configuration each make the entry miss. A hit reports the stored findings without reading the
 syntax tree.
 
