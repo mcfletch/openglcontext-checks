@@ -28,15 +28,28 @@ def test_a_project_with_no_table_gets_every_rule_and_the_default_scopes(tmp_path
     assert config.scopes_for('pkg/module.py') == frozenset()
 
 
-def test_the_nearest_table_is_used_and_its_directory_is_the_root(tmp_path):
+def test_the_table_is_found_from_a_directory_inside_the_project(tmp_path):
     _project(tmp_path, '[tool.openglcontext-checks]\nselect = ["OGC131"]\n')
     inner = tmp_path / 'sub' / 'deeper'
     inner.mkdir(parents=True)
-    (tmp_path / 'sub' / 'pyproject.toml').write_text('[project]\nname = "sub"\n')
     config = load_config(str(inner))
     assert config.root == str(tmp_path)
     assert config.selected == ('OGC131',)
     assert config.source == str(tmp_path / 'pyproject.toml')
+
+
+def test_a_project_inside_another_does_not_take_the_outer_table(tmp_path):
+    # The shape of a workspace of sub-projects: the outer table's paths and
+    # globs are relative to the outer root and mean nothing in the inner one.
+    _project(tmp_path, '[tool.openglcontext-checks]\n'
+                       'paths = ["tools"]\nselect = ["OGC131"]\n')
+    inner = tmp_path / 'sub'
+    inner.mkdir()
+    _project(inner, '[project]\nname = "sub"\n')
+    config = load_config(str(inner / 'pkg'))
+    assert (config.root, config.source) == (str(inner), str(inner / 'pyproject.toml'))
+    assert config.paths == ('.',)
+    assert config.selected == tuple(sorted(EVERY_CODE))
 
 
 def test_with_no_pyproject_anywhere_the_start_is_the_root(tmp_path, monkeypatch):

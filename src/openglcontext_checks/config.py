@@ -1,10 +1,10 @@
 """`[tool.openglcontext-checks]`: which rules run on which files.
 
-The table is read from the nearest `pyproject.toml` that has one, searching
-upwards from the starting directory; where none has the table, the nearest
-`pyproject.toml` of any kind marks the project root and every setting takes
-its default. The directory holding that file is the project root: configured
-paths and globs are relative to it, and the result cache lives in it.
+The project is the nearest directory at or above the starting one that holds
+a `pyproject.toml`, and the table is read from that file; where it has no
+table, every setting takes its default. A table in an enclosing project is not
+used. The project's directory is the root: configured paths and globs are
+relative to it, and the result cache lives in it.
 
 Keys:
 
@@ -136,9 +136,14 @@ class Config:
 
 
 def load_config(start: str) -> Config:
-    """The configuration for the project containing the directory `start`."""
+    """The configuration for the project containing the directory `start`.
+
+    The project is the nearest directory at or above `start` holding a
+    `pyproject.toml`. Its table, or the defaults when it has none, is the
+    configuration; a table further up belongs to an enclosing project, whose
+    paths and globs are relative to another root.
+    """
     start = os.path.abspath(start)
-    nearest: str | None = None
     for directory in _parents(start):
         candidate = os.path.join(directory, 'pyproject.toml')
         if not os.path.isfile(candidate):
@@ -147,11 +152,8 @@ def load_config(start: str) -> Config:
         table = tool.get(TABLE) if isinstance(tool, dict) else None
         if table is not None:
             return _from_table(table, directory, candidate)
-        if nearest is None:
-            nearest = candidate
-    if nearest is None:
-        return Config(root=start)
-    return Config(root=os.path.dirname(nearest), source=nearest)
+        return Config(root=directory, source=candidate)
+    return Config(root=start)
 
 
 def _parents(start: str) -> list[str]:

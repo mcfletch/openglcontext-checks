@@ -43,11 +43,12 @@ answered from the cache takes 0.06 s.
 
 ## Configuration
 
-Settings are read from `[tool.openglcontext-checks]` in the nearest
-`pyproject.toml`, searching upwards from the current directory, that has the
-table. The directory holding that file is the project root: configured paths
-and globs are relative to it. Where no `pyproject.toml` has the table, the
-nearest one of any kind marks the root and every setting takes its default.
+The project is the nearest directory, at or above the current one, holding a
+`pyproject.toml`, and settings are read from `[tool.openglcontext-checks]` in
+that file. Its directory is the project root: configured paths and globs are
+relative to it. Where that file has no table, every setting takes its default;
+a table in an enclosing project (a workspace root around several projects, say)
+is not used, since its paths are relative to another root.
 
 ```toml
 [tool.openglcontext-checks]
