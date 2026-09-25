@@ -209,14 +209,16 @@ def backend():
 ### OGC201: suppression without a reason
 
 A `# noqa` or `# type: ignore` that names no code, or names codes with no
-reason after them. A reason is at least one word after the codes, optionally
-after `-`, `--`, `:` or a dash; a plain comment straight after the pragma
-counts. Pragmas are read from comment tokens, so text in a string is never
-one.
+reason after them. A `# noqa`'s reason is at least one word after the codes,
+optionally after `-`, `--`, `:` or a dash. A `# type: ignore`'s reason is a
+comment of its own after it: mypy reports any other text after the codes as
+an invalid comment, so text written there is reported too. Pragmas are read
+from comment tokens, so text in a string is never one.
 
 ```python
 import os  # noqa: F401                                   # OGC201
 x = f()  # type: ignore                                   # OGC201 (bare)
+x = f()  # type: ignore[attr-defined] the stubs lack it   # OGC201 (mypy rejects it)
 x = f()  # type: ignore[attr-defined]  # the stubs lack it   # not reported
 ```
 

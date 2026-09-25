@@ -5,9 +5,12 @@ not one. A comment token can hold several pragmas (`# type: ignore[x]  # noqa:
 E501 reason`); each `#` starts a segment, and a segment is a pragma when it
 opens with `noqa` or `type: ignore`.
 
-A pragma's reason is the text after its codes, with a leading `-`, `--`, `:`
-or dash dropped. Where that is empty, a plain comment segment straight after
-it is the reason, which is the `# type: ignore[code]  # why` form mypy's own
+A `# noqa`'s reason is the text after its codes, with a leading `-`, `--`,
+`:` or dash dropped. A `# type: ignore` has no reason of its own: mypy accepts
+only whitespace or another `#` after one and reports anything else as an
+invalid comment, so the text there is kept as `trailing` instead. For either
+kind, where the reason is empty, a plain comment segment straight after it is
+the reason, which is the `# type: ignore[code]  # why` form mypy's own
 documentation uses.
 
 `# noqa` takes the codes ruff does (letters then digits, separated by commas
@@ -46,6 +49,9 @@ class Pragma:
     codes: tuple[str, ...]
     #: The text giving the reason, or '' where there is none.
     reason: str
+    #: Text written straight after the codes of a type-ignore pragma, which
+    #: mypy rejects; always '' for a noqa.
+    trailing: str = ''
 
     def suppresses(self, code: str) -> bool:
         """Whether this pragma suppresses an OGC finding of `code`.
@@ -85,17 +91,17 @@ def parse_comment(text: str, line: int, column: int) -> list[Pragma]:
     for index, (start, pragma) in enumerate(parsed):
         if pragma is None:
             continue
-        kind, codes, reason = pragma
+        kind, codes, reason, trailing = pragma
         if not reason and index + 1 < len(parsed) and parsed[index + 1][1] is None:
             following = segments[index + 1][1].strip(_LEAD)
             if _WORD.search(following):
                 reason = following
-        pragmas.append(Pragma(kind, line, column + start, codes, reason))
+        pragmas.append(Pragma(kind, line, column + start, codes, reason, trailing))
     return pragmas
 
 
-def _parse_segment(segment: str) -> tuple[str, tuple[str, ...], str] | None:
-    """(kind, codes, reason) where `segment` opens with a pragma, else None."""
+def _parse_segment(segment: str) -> tuple[str, tuple[str, ...], str, str] | None:
+    """(kind, codes, reason, trailing) where `segment` opens with a pragma, else None."""
     noqa = _NOQA.match(segment)
     if noqa:
         rest = noqa.group('rest')
@@ -106,12 +112,12 @@ def _parse_segment(segment: str) -> tuple[str, tuple[str, ...], str] | None:
                 codes.append(code.group('code'))
                 position = code.end()
             rest = rest[position:]
-        return NOQA, tuple(codes), _reason(rest)
+        return NOQA, tuple(codes), _reason(rest), ''
     ignore = _TYPE_IGNORE.match(segment)
     if ignore:
         listed = ignore.group('codes') or ''
         codes = [code.strip() for code in listed.split(',') if code.strip()]
-        return TYPE_IGNORE, tuple(codes), _reason(ignore.group('rest'))
+        return TYPE_IGNORE, tuple(codes), '', ignore.group('rest').strip()
     return None
 
 

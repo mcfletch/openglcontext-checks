@@ -35,25 +35,37 @@ def test_a_noqa_comment_names_its_codes_and_its_reason(comment, codes, reason):
 
 
 @pytest.mark.parametrize(
-    'comment, codes, reason',
+    'comment, codes, trailing',
     [
         (
             '# type: ignore[attr-defined] numpy stubs lack it',
             ('attr-defined',),
             'numpy stubs lack it',
         ),
-        ('# type: ignore[a, b]: two', ('a', 'b'), 'two'),
+        ('# type: ignore[a, b]: two', ('a', 'b'), ': two'),
+        ('# type: ignore[x] --', ('x',), '--'),
         ('# type: ignore[attr-defined]', ('attr-defined',), ''),
         ('# type: ignore', (), ''),
         ('# type: ignore[]', (), ''),
         ('# type:ignore[x] tight spacing', ('x',), 'tight spacing'),
     ],
 )
-def test_a_type_ignore_names_its_codes_and_its_reason(comment, codes, reason):
+def test_a_type_ignore_names_its_codes_and_what_follows_them(comment, codes, trailing):
+    """Text straight after the codes is kept apart, and is not a reason.
+
+    mypy accepts only whitespace or a second `#` after a `type: ignore`, and
+    reports anything else as an invalid comment.
+    """
     pragma = _only('x = 1  %s\n' % (comment,))
     assert pragma.kind == TYPE_IGNORE
     assert pragma.codes == codes
-    assert pragma.reason == reason
+    assert pragma.trailing == trailing
+    assert pragma.reason == ''
+
+
+def test_a_noqa_has_nothing_trailing():
+    """ruff reads the words after a noqa's codes as the comment they are."""
+    assert _only('x = 1  # noqa: E501 a long URL\n').trailing == ''
 
 
 def test_a_reason_may_follow_in_a_comment_of_its_own():

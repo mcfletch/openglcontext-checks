@@ -36,3 +36,6 @@ compatibility promise.
   bound only to a container the function makes, used only in place), a set
   or dict display compared or measured and dropped, or a lookup whose entry
   the function compares by identity with the keyed object.
+- OGC201 reports text written straight after a `# type: ignore`'s codes,
+  which mypy rejects as an invalid comment; a type-ignore's reason goes in a
+  comment of its own after it.
