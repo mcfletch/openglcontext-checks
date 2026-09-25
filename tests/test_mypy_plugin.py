@@ -204,6 +204,22 @@ def test_a_loader_does_not_open_a_path_nothing_contained(project):
     assert 'of type "Any"' in found[2]
 
 
+def test_an_unchecked_open_keeps_the_type_open_gives(project):
+    found = project(
+        {
+            'reader/__init__.py': '',
+            'reader/formats.py': """
+                def read(name: str) -> None:
+                    reveal_type(open(name, 'rb'))
+                    reveal_type(open(name, encoding='utf-8'))
+            """,
+        }
+    )
+    assert [line.split(': ', 2)[1] for line in found] == ['error', 'note', 'error', 'note']
+    assert 'BufferedReader' in found[1]
+    assert 'TextIOWrapper' in found[3]
+
+
 def test_a_module_outside_the_loader_scope_opens_what_it_likes(project):
     assert project({'tool.py': 'def read(name: str) -> None:\n    open(name)\n'}) == []
 
@@ -233,3 +249,24 @@ def test_a_changed_scope_is_checked_again_rather_than_answered_from_the_cache(pr
     assert project(modules) == []
     found = project(modules, table=TABLE.replace('"reader/**"', '"tool.py"'))
     assert [line.split(': error: ')[0] for line in found] == ['tool.py:2']
+
+
+def test_a_signature_hook_mypy_has_for_an_opener_still_gives_the_signature(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from mypy.options import Options
+
+    from openglcontext_checks.mypy_plugin import CheckedTypesPlugin
+
+    (tmp_path / 'pyproject.toml').write_text('[project]\nname = "x"\n', encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+    assert CheckedTypesPlugin(Options()).get_function_signature_hook('builtins.len') is None
+    refined = object()
+
+    class Default:
+        def get_function_signature_hook(self, fullname):
+            return lambda _ctx: refined
+
+    hook = CheckedTypesPlugin(Options(), Default()).get_function_signature_hook('builtins.open')
+    context = SimpleNamespace(args=[], api=SimpleNamespace(path='x.py'))
+    assert hook(context) is refined

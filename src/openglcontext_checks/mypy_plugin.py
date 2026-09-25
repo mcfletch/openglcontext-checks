@@ -39,9 +39,15 @@ from mypy.errorcodes import ErrorCode
 from mypy.messages import format_type
 from mypy.nodes import StrExpr, TypeInfo
 from mypy.options import Options
-from mypy.plugin import ClassDefContext, FunctionContext, Plugin, ReportConfigContext
+from mypy.plugin import (
+    ClassDefContext,
+    FunctionContext,
+    FunctionSigContext,
+    Plugin,
+    ReportConfigContext,
+)
 from mypy.plugins.default import DefaultPlugin
-from mypy.types import AnyType, Instance, Type, UnionType, get_proper_type
+from mypy.types import AnyType, FunctionLike, Instance, Type, UnionType, get_proper_type
 
 from .config import Config, load_config
 
@@ -88,18 +94,21 @@ UNCHECKED_OPEN = ErrorCode(
 )
 
 _Hook = Callable[[FunctionContext], Type]
+_SignatureHook = Callable[[FunctionSigContext], FunctionLike]
 
 
 class CheckedTypesPlugin(Plugin):
     """Refuses a checked type made outside its home, and an unchecked open in a loader."""
 
-    def __init__(self, options: Options) -> None:
+    def __init__(self, options: Options, default: Plugin | None = None) -> None:
+        """`default` is the plugin whose hooks for a call this one hands on to:
+        mypy's own unless another is given."""
         super().__init__(options)
         start = os.path.dirname(os.path.abspath(options.config_file or 'pyproject.toml'))
         self.config: Config = load_config(start)
         self.checked = frozenset(CHECKED_TYPES + self.config.checked_types)
         self.contained = tuple(CONTAINED_PATHS + self.config.contained_paths)
-        self._default = DefaultPlugin(options)
+        self._default = default if default is not None else DefaultPlugin(options)
 
     def report_config_data(self, ctx: ReportConfigContext) -> object:
         """What decides a module's findings, so a changed setting checks it again."""
@@ -112,9 +121,22 @@ class CheckedTypesPlugin(Plugin):
     def get_function_hook(self, fullname: str) -> _Hook | None:
         if fullname in self.checked:
             return self._chained(fullname, self._refuse_construction)
-        if fullname in OPENERS:
-            return self._chained(fullname, self._refuse_unchecked_open)
         return None
+
+    def get_function_signature_hook(self, fullname: str) -> _SignatureHook | None:
+        # A signature hook rather than a call hook for the openers: mypy runs
+        # a call hook while it tries each overload of `open`, and an error
+        # reported there makes every overload fail to match, which leaves the
+        # call typed by the last one (`IO[Any]`).
+        if fullname not in OPENERS:
+            return None
+        default = self._default.get_function_signature_hook(fullname)
+
+        def hook(ctx: FunctionSigContext) -> FunctionLike:
+            self._refuse_unchecked_open(ctx, fullname)
+            return default(ctx) if default is not None else ctx.default_signature
+
+        return hook
 
     def get_base_class_hook(self, fullname: str) -> Callable[[ClassDefContext], None] | None:
         if fullname in self.checked:
@@ -156,19 +178,21 @@ class CheckedTypesPlugin(Plugin):
                 )
                 return
 
-    def _refuse_unchecked_open(self, ctx: FunctionContext, fullname: str) -> None:
+    def _refuse_unchecked_open(self, ctx: FunctionSigContext, fullname: str) -> None:
         if not ctx.args or not ctx.args[0] or not self._in_loader_scope(ctx.api.path):
             return
-        if isinstance(ctx.args[0][0], StrExpr):
+        path = ctx.args[0][0]
+        if isinstance(path, StrExpr):
             return
-        for kind in _alternatives(ctx.arg_types[0][0]):
+        given = ctx.api.get_expression_type(path)
+        for kind in _alternatives(given):
             if self._unchecked(kind):
                 ctx.api.fail(
                     '%s() is handed a path of type %s, which nothing has contained; in a'
                     ' loader module a file is opened at a contained path (%s)'
                     % (
                         fullname.removeprefix('builtins.'),
-                        format_type(ctx.arg_types[0][0], ctx.api.options),
+                        format_type(given, ctx.api.options),
                         ', '.join(self.contained),
                     ),
                     ctx.context,
