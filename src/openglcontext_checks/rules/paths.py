@@ -85,6 +85,8 @@ def assigned(name: ast.Name, symbols: Symbols) -> list[ast.expr] | None:
     tuple target is unpacked from when it is not a literal of the same length.
     A parameter the function reassigns has `PARAMETER` among its values.
     """
+    if name is PARAMETER:
+        return None
     scope = symbols.binding_scope(name)
     if scope is None or isinstance(scope, ast.ClassDef) or symbols.lookup(name).kind != LOCAL:
         return None
@@ -260,7 +262,7 @@ def base(node: ast.expr, symbols: Symbols, seen: frozenset[str] = frozenset()) -
     joined = parts(node, symbols)
     if joined is not None:
         return base(joined[0], symbols, seen)
-    if isinstance(node, ast.Name) and node is not PARAMETER and node.id not in seen:
+    if isinstance(node, ast.Name) and node.id not in seen:
         values = assigned(node, symbols)
         if values is not None:
             return [found for value in values for found in base(value, symbols, seen | {node.id})]

@@ -101,6 +101,11 @@ def test_a_name_reassigned_from_a_parameter_keeps_the_parameter():
     assert len(_found(_in_function(body))) == 1
 
 
+def test_a_parameter_reassigned_and_opened_as_it_is_is_not_reported():
+    body = 'if names:\n    name = "fixed.glb"\nreturn open(name)'
+    assert _found(_in_function(body)) == []
+
+
 def test_a_name_assigned_a_fixed_value_only_is_fixed():
     body = 'member = "fixed.glb"\nreturn open(os.path.join(base, member))'
     assert _found(_in_function(body)) == []
