@@ -1,8 +1,13 @@
 """Discovering files and checking them, with the cache between runs."""
 
+import os
+import pickle
+
 import pytest
 
+from openglcontext_checks import runner
 from openglcontext_checks.config import ConfigError, load_config
+from openglcontext_checks.engine import ParseError
 from openglcontext_checks.runner import check_files, discover
 
 KEYED = 'cache = {}\ndef fit(mesh):\n    cache[id(mesh)] = 1\n'
@@ -70,23 +75,25 @@ def test_discovery_lists_python_files_once_in_order(root):
 
 def test_a_file_on_another_drive_is_shown_by_its_full_path(root, monkeypatch):
     """`os.path.relpath` refuses across Windows drives."""
-    import openglcontext_checks.runner as runner
+    elsewhere = root / 'elsewhere'
+    elsewhere.mkdir()
+    relpath = os.path.relpath
 
-    def across_drives(path, start):
-        raise ValueError('path is on mount %r, start on mount %r' % (path, start))
+    def across_drives(path, start=os.curdir):
+        if start == str(elsewhere):
+            raise ValueError('path is on mount %r, start on mount %r' % (path, start))
+        return relpath(path, start)
 
     config = load_config(str(root))
-    files = discover(config, None, str(root))
+    files = discover(config, ['a.py'], str(root))
     monkeypatch.setattr(runner.os.path, 'relpath', across_drives)
-    assert runner._shown(files[0], str(root)) == files[0]
+    report = check_files(config, files, cwd=str(elsewhere), cache=False)
+    assert [shown for shown, _finding in report.findings] == files
 
 
 def test_a_parse_error_survives_the_trip_from_a_worker():
-    import pickle
-
-    from openglcontext_checks.engine import ParseError
-
-    error = pickle.loads(pickle.dumps(ParseError('x.py', 3, 4, 'invalid syntax')))
+    pickled = pickle.dumps(ParseError('x.py', 3, 4, 'invalid syntax'))
+    error = pickle.loads(pickled)  # noqa: S301 bytes this test pickled itself
     assert (error.path, error.line, error.column, error.message) == ('x.py', 3, 4, 'invalid syntax')
 
 
