@@ -60,8 +60,11 @@ def read_pragmas(source: bytes) -> list[Pragma]:
     """Every pragma in `source`, in the order they appear.
 
     Raises `tokenize.TokenError` or `SyntaxError` for source that does not
-    tokenize.
+    tokenize. Source without the bytes of either pragma has none, and is not
+    tokenized.
     """
+    if b'ignore' not in source and b'noqa' not in source.lower():
+        return []
     found: list[Pragma] = []
     for token in tokenize.tokenize(io.BytesIO(source).readline):
         if token.type == tokenize.COMMENT:

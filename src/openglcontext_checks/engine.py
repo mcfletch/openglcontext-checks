@@ -30,6 +30,10 @@ class ParseError(Exception):
         self.column = column
         self.message = message
 
+    def __reduce__(self) -> tuple[type[ParseError], tuple[str, int, int, str]]:
+        """Rebuilt from its fields, so a worker process can hand one back."""
+        return ParseError, (self.path, self.line, self.column, self.message)
+
 
 @dataclasses.dataclass(frozen=True)
 class Module:
@@ -72,7 +76,7 @@ def run_rules(module: Module, rules: Sequence[Rule]) -> list[Finding]:
         for node_type in rule.nodes:
             dispatch.setdefault(node_type, []).append(rule)
     if dispatch:
-        for node in ast.walk(module.tree):
+        for node in module.symbols.nodes:
             for rule in dispatch.get(type(node), ()):
                 found.update(rule.visit(node, module))
     by_line: dict[int, list[Pragma]] = {}

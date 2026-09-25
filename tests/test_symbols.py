@@ -123,6 +123,7 @@ def test_every_way_of_binding_a_name_is_local():
         match 1:
             case [d, *e]: pass
             case {'k': 1, **f}: pass
+            case {'only': 2}: pass
         g = lambda h: h
         class I: pass
         async def j(k, *l, m, **n): pass

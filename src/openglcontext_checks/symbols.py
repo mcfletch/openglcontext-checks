@@ -32,6 +32,20 @@ UNBOUND = 'unbound'
 
 _BUILTINS = frozenset(dir(builtins))
 _FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+_SCOPE_TYPES = (*_FUNCTIONS, ast.ClassDef)
+_BINDING_TYPES = frozenset(
+    {
+        ast.Name,
+        ast.Import,
+        ast.ImportFrom,
+        ast.ExceptHandler,
+        ast.MatchAs,
+        ast.MatchStar,
+        ast.MatchMapping,
+    }
+)
+#: Node types CPython shares between every place they occur: `Load`, `Add`...
+_SINGLETONS = (ast.expr_context, ast.boolop, ast.operator, ast.unaryop, ast.cmpop)
 _Scope = ast.Module | ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda | ast.ClassDef
 
 
@@ -53,6 +67,9 @@ class Symbols:
         self._outer: dict[_Scope, _Scope | None] = {tree: None}
         self._bound: dict[_Scope, dict[str, str | None]] = {tree: {}}
         self._stars: dict[_Scope, list[str]] = {tree: []}
+        #: Every node of the tree, each once, the module first; the operator
+        #: and load/store markers, which carry nothing a rule reads, left out.
+        self.nodes: list[ast.AST] = []
         self._build(tree)
 
     def parent(self, node: ast.AST) -> ast.AST | None:
@@ -150,12 +167,18 @@ class Symbols:
     def _build(self, tree: ast.Module) -> None:
         # Iterative rather than recursive: a long chain of binary operators is
         # nested as deep as it is long.
+        parents = self._parents
+        scopes = self._scopes
+        nodes = self.nodes
         stack: list[tuple[ast.AST, _Scope]] = [(tree, tree)]
         while stack:
             node, scope = stack.pop()
-            self._scopes[node] = scope
+            scopes[node] = scope
+            nodes.append(node)
             inner: _Scope | None = None
-            if isinstance(node, (*_FUNCTIONS, ast.ClassDef)):
+            kind = type(node)
+            if kind in _SCOPE_TYPES:
+                assert isinstance(node, _SCOPE_TYPES)
                 inner = node
                 self._open(inner, scope)
                 if not isinstance(node, ast.Lambda):
@@ -171,14 +194,19 @@ class Symbols:
                     ):
                         if argument is not None:
                             self._bind(inner, argument.arg)
-            else:
+            elif kind in _BINDING_TYPES:
                 self._record_binding(node, scope)
-            for field, value in ast.iter_fields(node):
+            for field in node._fields:
+                value = getattr(node, field, None)
                 child_scope = inner if inner is not None and field == 'body' else scope
-                for child in value if isinstance(value, list) else [value]:
-                    if isinstance(child, ast.AST):
-                        self._parents[child] = node
-                        stack.append((child, child_scope))
+                if isinstance(value, list):
+                    for child in value:
+                        if isinstance(child, ast.AST):
+                            parents[child] = node
+                            stack.append((child, child_scope))
+                elif isinstance(value, ast.AST) and not isinstance(value, _SINGLETONS):
+                    parents[value] = node
+                    stack.append((value, child_scope))
 
     def _record_binding(self, node: ast.AST, scope: _Scope) -> None:
         if isinstance(node, ast.Name):
