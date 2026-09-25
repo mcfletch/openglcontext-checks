@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING
 
 from ..findings import Finding
 from .base import Invalid, Rule, snippet
+from .paths import fixed
 
 if TYPE_CHECKING:
     from ..engine import Module
+    from ..symbols import Symbols
 
 _CONVERSIONS = frozenset({'builtins.float', 'builtins.int', 'builtins.bool'})
 
@@ -28,7 +30,8 @@ class BareDocumentConversion(Rule):
     and `bool('false')` is true.
 
     Not reported: an index by a number or a variable (`shape[0]`,
-    `values[key]`), which is a sequence or a table the program built, and a
+    `values[key]`), which is a sequence or a table the program built; a field
+    of a table the module itself holds (a constant it defines or imports); and a
     conversion outside the `loader` scope, which a project gives the modules
     that read documents.
 
@@ -81,7 +84,7 @@ class BareDocumentConversion(Rule):
         if qualified not in _CONVERSIONS or not node.args:
             return
         field = node.args[0]
-        if not named_field(field):
+        if not named_field(field, module.symbols):
             return
         yield self.finding(
             node,
@@ -96,17 +99,23 @@ class BareDocumentConversion(Rule):
         )
 
 
-def named_field(node: ast.expr) -> bool:
-    """Whether `node` reads a mapping's field named by a string literal."""
+def named_field(node: ast.expr, symbols: Symbols) -> bool:
+    """Whether `node` reads a field named by a string literal from a mapping it was handed.
+
+    A table the module itself holds (a constant, or a name it imports) is the
+    program's own data rather than a document's.
+    """
     if isinstance(node, ast.Subscript):
-        key = node.slice
+        key, table = node.slice, node.value
     elif (
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
         and node.func.attr == 'get'
         and node.args
     ):
-        key = node.args[0]
+        key, table = node.args[0], node.func.value
     else:
         return False
-    return isinstance(key, ast.Constant) and isinstance(key.value, str)
+    return (
+        isinstance(key, ast.Constant) and isinstance(key.value, str) and not fixed(table, symbols)
+    )

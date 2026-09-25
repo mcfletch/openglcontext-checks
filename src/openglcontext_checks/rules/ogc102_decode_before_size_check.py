@@ -132,7 +132,9 @@ class DecodeBeforeSizeCheck(Rule):
                 for position, keyword in _ALLOCATIONS[qualified]
                 for value in _argument(node, position, keyword)
                 if any(
-                    named_field(inner) for inner in ast.walk(value) if isinstance(inner, ast.expr)
+                    named_field(inner, symbols)
+                    for inner in ast.walk(value)
+                    if isinstance(inner, ast.expr)
                 )
             ]
         else:

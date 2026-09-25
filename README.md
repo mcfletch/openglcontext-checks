@@ -177,7 +177,8 @@ subscript by a string literal (`extras['depth']`) or a `get` call with a
 string literal first (`params.get('count', 0)`), in the `loader` scope. A
 misspelt value raises and aborts the load, `1e999` and `nan` pass `float`,
 a count of four billion passes `int`, and `bool('false')` is true. An index
-by a number or a variable (`shape[0]`, `values[key]`) is not reported. Read
+by a number or a variable (`shape[0]`, `values[key]`), and a field of a table
+the module itself defines or imports, are not reported. Read
 the value through a reader that checks it, reports it once and answers a
 default: `OpenGLContext.loaders.documentvalues.DocumentValues`.
 

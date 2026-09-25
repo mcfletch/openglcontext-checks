@@ -153,7 +153,7 @@ def _built(node: ast.expr, symbols: Symbols, seen: frozenset[str]) -> tuple[str,
     node = unwrap(node, symbols)
     if isinstance(node, ast.IfExp):
         return _built(node.body, symbols, seen) or _built(node.orelse, symbols, seen)
-    if named_field(node):
+    if named_field(node, symbols):
         return 'read from', node
     joined = parts(node, symbols)
     if joined is not None:

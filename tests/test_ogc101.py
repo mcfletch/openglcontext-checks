@@ -56,3 +56,17 @@ def test_a_conversion_rebound_locally_is_not_the_builtin():
 def test_bool_of_a_named_field_is_reported():
     """`bool('false')` is True: the octahedral hemisphere was read that way."""
     assert len(_found('def f(extras):\n    return bool(extras.get("hemi"))\n')) == 1
+
+
+def test_a_field_of_the_module_s_own_table_is_not_a_document_value():
+    source = (
+        'HINTS = {"maxParticles": {"maximum": 10000}}\n'
+        'def most():\n'
+        '    return int(HINTS["maxParticles"]["maximum"]) + int(HINTS.get("step"))\n'
+    )
+    assert _found(source) == []
+
+
+def test_a_field_of_a_parameter_s_table_is_a_document_value():
+    source = 'HINTS = {}\ndef most(hints):\n    return int(hints["maxParticles"]["maximum"])\n'
+    assert len(_found(source)) == 1
