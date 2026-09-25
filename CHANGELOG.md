@@ -9,4 +9,20 @@ compatibility promise.
 
 ### Added
 
-- The package, with its version and type declarations.
+- The rules OGC131 (`id()` as a key), OGC141 (GL call in `__del__`), OGC161
+  (configuration or I/O at import), OGC201 (suppression without a reason),
+  and, in the `test` scope, OGC221 (skip inside an `except`), OGC222 (test
+  with no assertion) and OGC223 (`pass` in a test's handler). Each carries
+  `VALID` and `INVALID` examples that the suite runs.
+- `oglc-check [paths]`, printing `path:line:column: CODE message`, with
+  `--statistics`, `--select`, `--ignore`, `--no-cache` and `--jobs`. Exit
+  status 0 clean, 1 findings, 2 usage, configuration or parse error.
+- Configuration in `[tool.openglcontext-checks]`: `paths`, `select`,
+  `ignore`, `exclude`, `per-file-ignores` and `scopes`.
+- Suppression by `# noqa: CODE reason`, in ruff's syntax; a suppression with
+  no reason does not suppress.
+- A per-project result cache in `.oglc-check-cache/`, keyed on each file's
+  bytes, the package version and the settings that apply to it.
+- Checking across worker processes for a run of 48 or more files to parse.
+- A pytest entry point, `-p openglcontext_checks.pytest_plugin`: one item per
+  selected rule in a run of the suite.
