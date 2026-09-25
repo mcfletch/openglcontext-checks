@@ -1,0 +1,87 @@
+name: tests
+
+on:
+  # This project's own develop, and pull requests. `release.yml` runs this on
+  # every push to main and then decides whether the version is worth
+  # publishing, so main is covered from there rather than by a `push:` trigger
+  # here, which would run the whole matrix twice per push.
+  push:
+    branches: [develop]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  test:
+    name: ${{ matrix.python-version }} · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        # The package is pure Python, but it reads files, walks directories,
+        # matches path globs and replaces its cache with a rename, and each
+        # of those has a platform of its own.
+        include:
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[test]"
+      - name: Test, with the coverage floor
+        # `coverage run` rather than a pytest plugin: the suite loads this
+        # package's own pytest entry point with `-p`, which happens before a
+        # plugin could start measuring.
+        run: |
+          python -m coverage run -m pytest
+          python -m coverage report
+
+  lint:
+    name: ruff and mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      - name: ruff
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: mypy
+        run: mypy src/openglcontext_checks
+      - name: oglc-check over itself
+        run: oglc-check
+
+  # `requires-python = ">=3.10"` is a claim about installing, so it is checked
+  # where a user meets it: a plain install of the sdist, and the suite run from
+  # inside the unpacked sdist, so a file the sdist failed to carry is missing.
+  install:
+    name: sdist installs clean
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Build and install the sdist
+        run: |
+          python -m pip install --upgrade pip build pytest
+          python -m build --sdist
+          python -m pip install dist/*.tar.gz
+      - name: Run the command from somewhere that is not the checkout
+        run: cd /tmp && oglc-check --version
+      - name: Run the suite from inside the unpacked sdist
+        run: |
+          mkdir -p "${RUNNER_TEMP}/unpacked"
+          tar -C "${RUNNER_TEMP}/unpacked" --strip-components=1 -xzf dist/*.tar.gz
+          cd "${RUNNER_TEMP}/unpacked" && python -m pytest -q tests

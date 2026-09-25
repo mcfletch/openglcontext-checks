@@ -1,0 +1,144 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openglcontext-checks"
+# Read from src/openglcontext_checks/__init__.py -- see [tool.setuptools.dynamic]
+# below. One definition, because the release workflow decides whether to
+# publish by reading `__version__`, and the result cache is keyed on it.
+dynamic = ["version"]
+description = "Static checks for the defect classes the OpenGLContext stack's reviews keep finding"
+readme = "README.md"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [
+    { name = "Mike C. Fletcher", email = "mcfletch@vrplumber.com" }
+]
+keywords = ["lint", "static analysis", "ast", "OpenGL", "pytest"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Software Development :: Quality Assurance",
+    "Typing :: Typed",
+]
+# The standard library only. Python 3.10 has no `tomllib`, and `tomli` is the
+# package that module was taken from; from 3.11 on nothing is installed.
+dependencies = [
+    'tomli>=1.1; python_version < "3.11"',
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.3",
+    "coverage[toml]>=7",
+]
+dev = [
+    "openglcontext-checks[test]",
+    "mypy",
+    "ruff",
+]
+
+[project.scripts]
+oglc-check = "openglcontext_checks.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/mcfletch/openglcontext-checks"
+Repository = "https://github.com/mcfletch/openglcontext-checks"
+
+[tool.setuptools.dynamic]
+version = {attr = "openglcontext_checks.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+openglcontext_checks = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# `importlib` import mode keeps the suite importing the installed package
+# rather than a same-named directory beside it.
+addopts = "-ra --import-mode=importlib"
+pythonpath = ["tests"]
+
+[tool.coverage.run]
+source = ["openglcontext_checks"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "B",
+    "ARG",  # unused arguments
+    "I",    # import order
+    "UP",   # constructs superseded by the minimum Python
+    "SIM",  # simplifications
+    "C4",   # comprehensions
+    "RUF",
+    "PGH003", "PGH004",  # a type: ignore or noqa names what it silences
+    "PLE0604", "PLE0605",  # __all__ holds only strings
+]
+ignore = [
+    "E501",   # line too long: held by the formatter's line-length, above
+    # Diagnostics use ``%`` formatting throughout, so that the message and the
+    # values it interpolates read as two separate things.
+    "UP031",
+]
+# The OGC codes are this package's own; ruff is told they exist so that a
+# shared `# noqa: E501, OGC131 reason` is not reported as naming unknown codes.
+external = ["OGC"]
+
+[tool.ruff.format]
+quote-style = "single"
+exclude = ["*.md"]
+
+[tool.mypy]
+# The floor, since that is the oldest interpreter a user runs this on.
+python_version = "3.10"
+strict = true
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "possibly-undefined", "redundant-expr"]
+
+[[tool.mypy.overrides]]
+# Only installed on 3.10, where it stands in for `tomllib`.
+module = ["tomli"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# The pytest entry point subclasses pytest's own node classes and uses its hook
+# decorator. Where pytest is installed (CI, the dev extra) those are typed;
+# the workspace's non-editable typecheck environment installs no pytest, and
+# there they are `Any`.
+module = ["openglcontext_checks.pytest_plugin"]
+disallow_subclassing_any = false
+disallow_untyped_decorators = false
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = ["pytest", "_pytest.*"]
+ignore_missing_imports = true
+
+# uv judges whether its cached metadata for a source tree is current from
+# pyproject.toml alone unless told otherwise, and this project's version lives
+# in src/openglcontext_checks/__init__.py.
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/openglcontext_checks/__init__.py" }]

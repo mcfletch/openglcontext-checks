@@ -1,0 +1,17 @@
+build/
+dist/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+# oglc-check's own result cache. It also writes a `.gitignore` of its own
+# inside the directory, so a project that does not name it here still keeps
+# it out of version control.
+.oglc-check-cache/
+
+# uv lock (not tracked for a library)
+uv.lock
