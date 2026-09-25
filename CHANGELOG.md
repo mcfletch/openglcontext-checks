@@ -32,3 +32,7 @@ compatibility promise.
 - The `script` scope, for a project's programs run by path, which OGC161
   does not run on; a rule declares a scope it does not run in as
   `exempt_scope`. A scope's glob with a leading `!` takes paths out of it.
+- OGC131 does not report a table that exists for one call (a local name
+  bound only to a container the function makes, used only in place), a set
+  or dict display compared or measured and dropped, or a lookup whose entry
+  the function compares by identity with the keyed object.

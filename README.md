@@ -140,11 +140,25 @@ left side of `in`, the first argument of `get`, `setdefault`, `pop`, `add`,
 statement does not also store `x`. An id is reused as soon as its object is
 collected, and the table then answers a new object with the old one's entry.
 Key on the object (a `WeakKeyDictionary` where the table should not keep it
-alive), or hold the object in the entry.
+alive), or hold the object in the entry and compare it on lookup.
+
+Not reported: a table that exists for one call (a local name bound only to a
+container made in the function, used only in place, never passed on,
+returned, stored or read from a nested function), a set or dict display that
+is compared or measured with `len` and dropped, and a lookup whose entry the
+function compares by identity with the object (`entry[0] is x`).
 
 ```python
 _FITS[id(positions)] = fitted          # OGC131
 _FITS[id(positions)] = (positions, fitted)   # holds the object: not reported
+
+entry = _FITS.get(id(positions))       # compared on lookup: not reported
+if entry is None or entry[0] is not positions:
+    ...
+
+seen = set()                           # the call's own table: not reported
+for node in walk(root):
+    seen.add(id(node))
 ```
 
 ### OGC141: GL call in `__del__`

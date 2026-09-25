@@ -65,3 +65,49 @@ def test_a_long_expression_is_shortened_in_the_message():
 
 def test_an_id_in_a_list_display_is_not_a_key():
     assert _found('ids = [id(a), id(b)]\n') == []
+
+
+def _in_function(body):
+    return _found('def walk(nodes):\n' + ''.join('    %s\n' % line for line in body))
+
+
+def test_a_table_unpacked_from_a_tuple_of_new_containers_is_the_call_s_own():
+    assert _in_function(['found, seen = [], {id(nodes): 1}', 'return found']) == []
+
+
+def test_a_table_unpacked_from_something_else_is_not_known_to_be_new():
+    assert len(_in_function(['found, seen = pair', 'seen.add(id(nodes))'])) == 1
+
+
+def test_a_name_bound_by_an_import_is_not_the_call_s_own():
+    source = 'from registry import TABLE\ndef walk(node):\n    TABLE[id(node)] = 1\n'
+    assert len(_found(source)) == 1
+
+
+def test_a_container_made_with_keywords_is_not_known_to_be_empty():
+    assert len(_in_function(['seen = dict(**others)', 'seen[id(nodes)] = 1'])) == 1
+
+
+def test_a_table_handed_on_through_a_boolean_expression_escapes():
+    body = ['seen = set()', 'seen.add(id(nodes))', 'kept = seen or other']
+    assert len(_in_function(body)) == 1
+
+
+def test_a_table_compared_with_another_stays_in_the_call():
+    body = ['seen = set()', 'seen.add(id(nodes))', 'same = seen == other']
+    assert _in_function(body) == []
+
+
+def test_a_table_from_any_other_call_is_not_known_to_be_new():
+    assert len(_in_function(['seen = registry()', 'seen.add(id(nodes))'])) == 1
+
+
+def test_a_table_walked_after_it_is_filled_stays_in_the_call():
+    body = [
+        'import collections',
+        'seen = collections.defaultdict(list, [])',
+        'seen[id(nodes)].append(1)',
+        'for key in seen:',
+        '    print(key)',
+    ]
+    assert _in_function(body) == []
