@@ -70,6 +70,15 @@ class Symbols:
         """The scope `node` is evaluated in."""
         return self._scopes[node]
 
+    def enclosing_function(
+        self, node: ast.AST
+    ) -> ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda | None:
+        """The innermost function or lambda containing `node`, or None."""
+        for ancestor in self.ancestors(node):
+            if isinstance(ancestor, _FUNCTIONS):
+                return ancestor
+        return None
+
     def runs_at_import(self, node: ast.AST) -> bool:
         """Whether `node` is evaluated when the module is imported.
 

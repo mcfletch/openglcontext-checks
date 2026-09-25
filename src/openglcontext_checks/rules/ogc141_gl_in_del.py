@@ -13,8 +13,6 @@ from .base import Invalid, Rule, snippet
 if TYPE_CHECKING:
     from ..engine import Module
 
-_FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
-
 
 class GlInDel(Rule):
     """A call to an OpenGL function inside a `__del__` method.
@@ -134,10 +132,7 @@ class GlInDel(Rule):
     def visit(self, node: ast.AST, module: Module) -> Iterator[Finding]:
         assert isinstance(node, ast.Call)
         symbols = module.symbols
-        function = next(
-            (ancestor for ancestor in symbols.ancestors(node) if isinstance(ancestor, _FUNCTIONS)),
-            None,
-        )
+        function = symbols.enclosing_function(node)
         if not isinstance(function, ast.FunctionDef) or function.name != '__del__':
             return
         qualified = symbols.qualified_name(node.func)

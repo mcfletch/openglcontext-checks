@@ -7,6 +7,7 @@ from .ogc131_id_key import IdAsKey
 from .ogc141_gl_in_del import GlInDel
 from .ogc161_import_time import WorkAtImport
 from .ogc201_unreasoned_suppression import UnreasonedSuppression
+from .ogc221_skip_in_except import SkipInExcept
 
 #: One instance of every rule, in code order. Rules hold no state.
 ALL_RULES: tuple[Rule, ...] = (
@@ -14,6 +15,7 @@ ALL_RULES: tuple[Rule, ...] = (
     GlInDel(),
     WorkAtImport(),
     UnreasonedSuppression(),
+    SkipInExcept(),
 )
 
 #: Each rule by its code.

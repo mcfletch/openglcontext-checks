@@ -218,3 +218,17 @@ def test_module_and_class_bodies_run_at_import_and_function_bodies_do_not():
     seps = [node for node in ast.walk(tree) if isinstance(node, ast.Attribute)]
     at_import = sorted(node.lineno for node in seps if symbols.runs_at_import(node))
     assert at_import == [3, 5, 6]
+
+
+def test_the_enclosing_function_is_the_innermost_one():
+    tree, symbols = _names("""
+        def outer():
+            inner = lambda: value
+            return other
+        top = level
+    """)
+    outer = tree.body[0]
+    lambda_body = outer.body[0].value.body
+    assert symbols.enclosing_function(lambda_body) is outer.body[0].value
+    assert symbols.enclosing_function(outer.body[1].value) is outer
+    assert symbols.enclosing_function(tree.body[1].value) is None
