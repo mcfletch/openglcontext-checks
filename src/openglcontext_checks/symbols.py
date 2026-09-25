@@ -70,6 +70,19 @@ class Symbols:
         """The scope `node` is evaluated in."""
         return self._scopes[node]
 
+    def runs_at_import(self, node: ast.AST) -> bool:
+        """Whether `node` is evaluated when the module is imported.
+
+        True at module level and in class bodies, including a function's
+        decorators and defaults there; False inside any function or lambda.
+        """
+        scope: _Scope | None = self._scopes[node]
+        while scope is not None:
+            if isinstance(scope, _FUNCTIONS):
+                return False
+            scope = self._outer[scope]
+        return True
+
     def lookup(self, node: ast.Name) -> Binding:
         """What the name `node` refers to where it appears."""
         name = node.id

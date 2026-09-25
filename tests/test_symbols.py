@@ -200,3 +200,21 @@ def test_a_star_import_in_a_class_body_is_not_seen_from_its_methods():
                 glFinish()
     """)
     assert symbols.star_modules(_call_target(tree, 'glFinish')) == ()
+
+
+def test_module_and_class_bodies_run_at_import_and_function_bodies_do_not():
+    tree, symbols = _names("""
+        import os
+        X = os.sep
+        class Holder:
+            Y = os.sep
+            def method(self, z=os.sep):
+                return os.sep
+            f = lambda: os.sep
+        def factory():
+            class Local:
+                W = os.sep
+    """)
+    seps = [node for node in ast.walk(tree) if isinstance(node, ast.Attribute)]
+    at_import = sorted(node.lineno for node in seps if symbols.runs_at_import(node))
+    assert at_import == [3, 5, 6]
