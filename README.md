@@ -219,9 +219,10 @@ card = Image.open(fetch.local_copy(fetch.beside(directory, species['card'])))  #
 
 ### OGC121: file written in place
 
-`open`, `io.open`, `codecs.open`, the `open` of `gzip`, `bz2` and `lzma`,
-`tarfile.open` or `zipfile.ZipFile` with a literal mode that writes (`w`,
-`a`, `x`, `+`); `shutil.copy`, `copy2`, `copyfile` or `copytree` to a
+`open`, `io.open`, `codecs.open`, or the `open` of `gzip`, `bz2` and `lzma`,
+with a literal mode that writes over what the file holds (`w`, `x`, or `+`
+other than to append); `tarfile.open` or `zipfile.ZipFile` with a mode that
+writes (`w`, `a`, `x`); `shutil.copy`, `copy2`, `copyfile` or `copytree` to a
 destination; and `write_text` or `write_bytes` on anything that is not an
 imported module. Not run in the `test` scope. A write cut short leaves part
 of the file, which the next run takes for the whole. Not reported: a write
@@ -229,6 +230,8 @@ under a directory or to a file that a sanctioned staging call
 (`OpenGLContext.atomicfiles.staged_file`, `staged_directory`) or
 `tempfile.mkdtemp`, `mkstemp` or `TemporaryDirectory` made, and a write to a
 name the same function moves into place with `os.replace` or `os.rename`.
+A stream opened to append (a log, a journal, a lock file) keeps what it held
+and is not reported.
 
 ```python
 with open(path, 'w') as handle:                   # OGC121

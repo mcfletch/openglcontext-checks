@@ -114,4 +114,22 @@ def test_a_module_function_named_write_text_is_not_a_path_method():
 
 
 def test_a_write_at_module_level_is_reported():
-    assert len(_found('open("log.txt", "a").write("x")\n')) == 1
+    assert len(_found('open("log.txt", "w").write("x")\n')) == 1
+
+
+@pytest.mark.parametrize('mode', ['a', 'ab', 'a+b', 'at'])
+def test_appending_to_a_file_is_not_writing_it_in_place(mode):
+    """A log, a journal or a lock file keeps what it held; there is nothing to stage."""
+    assert (
+        _found('import gzip\ndef f(p):\n    open(p, %r)\n    gzip.open(p, %r)\n' % (mode, mode))
+        == []
+    )
+
+
+@pytest.mark.parametrize('mode', ['r+', 'r+b', 'w+b', 'x'])
+def test_editing_or_creating_a_file_is_writing_it_in_place(mode):
+    assert len(_found('def f(p):\n    open(p, %r)\n' % (mode,))) == 1
+
+
+def test_appending_to_an_archive_rewrites_its_index_in_place():
+    assert len(_found('import zipfile\ndef f(p):\n    zipfile.ZipFile(p, "a")\n')) == 1

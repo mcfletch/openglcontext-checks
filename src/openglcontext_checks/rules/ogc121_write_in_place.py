@@ -13,17 +13,20 @@ from .paths import base, region, statements_of
 if TYPE_CHECKING:
     from ..engine import Module
 
-#: The openers, with where each takes its path and its mode, and the mode
-#: characters that make it write.
-_OPENERS: dict[str, tuple[tuple[int, str], tuple[int, str], str]] = {
-    'builtins.open': ((0, 'file'), (1, 'mode'), 'wax+'),
-    'io.open': ((0, 'file'), (1, 'mode'), 'wax+'),
-    'codecs.open': ((0, 'filename'), (1, 'mode'), 'wax+'),
-    'gzip.open': ((0, 'filename'), (1, 'mode'), 'wax+'),
-    'bz2.open': ((0, 'filename'), (1, 'mode'), 'wax+'),
-    'lzma.open': ((0, 'filename'), (1, 'mode'), 'wax+'),
-    'tarfile.open': ((0, 'name'), (1, 'mode'), 'wax'),
-    'zipfile.ZipFile': ((0, 'file'), (1, 'mode'), 'wax'),
+#: The openers of a stream, with where each takes its path and its mode.
+_STREAMS: dict[str, tuple[tuple[int, str], tuple[int, str]]] = {
+    'builtins.open': ((0, 'file'), (1, 'mode')),
+    'io.open': ((0, 'file'), (1, 'mode')),
+    'codecs.open': ((0, 'filename'), (1, 'mode')),
+    'gzip.open': ((0, 'filename'), (1, 'mode')),
+    'bz2.open': ((0, 'filename'), (1, 'mode')),
+    'lzma.open': ((0, 'filename'), (1, 'mode')),
+}
+
+#: The openers of an archive, which rewrite its index to add a member too.
+_ARCHIVES: dict[str, tuple[tuple[int, str], tuple[int, str]]] = {
+    'tarfile.open': ((0, 'name'), (1, 'mode')),
+    'zipfile.ZipFile': ((0, 'file'), (1, 'mode')),
 }
 
 #: The copies, with where each takes its destination.
@@ -47,9 +50,10 @@ _RENAMES = frozenset({'os.replace', 'os.rename'})
 class WriteInPlace(Rule):
     """A file written where a reader will look for it, while it is written.
 
-    Reported: `open` and `io.open`, `codecs.open`, `gzip.open`, `bz2.open`,
-    `lzma.open`, `tarfile.open` and `zipfile.ZipFile` with a literal mode
-    that writes (`w`, `a`, `x` or `+`); `shutil.copy`, `copy2`, `copyfile`
+    Reported: `open` and `io.open`, `codecs.open`, `gzip.open`, `bz2.open`
+    and `lzma.open` with a literal mode that writes over what the file holds
+    (`w`, `x`, or `+` other than to append), `tarfile.open` and
+    `zipfile.ZipFile` with a mode that writes (`w`, `a` or `x`); `shutil.copy`, `copy2`, `copyfile`
     and `copytree` to a destination; and `write_text` or `write_bytes` called
     on anything that is not an imported module (a `pathlib.Path`). A write
     cut short (a full disk, a crash, Ctrl-C, a killed thread) leaves part of
@@ -61,7 +65,9 @@ class WriteInPlace(Rule):
     through joins and local names), or that `tempfile.mkdtemp`, `mkstemp` or
     `TemporaryDirectory` made; a write to a name the same function then
     moves into place with `os.replace` or `os.rename` (or the path's own
-    `replace` or `rename`); a mode that is not a literal. Not run on the
+    `replace` or `rename`); a mode that is not a literal; a stream opened
+    to append, which keeps what it held (a log, a journal, a lock file) and
+    has no staged form. Not run on the
     `test` scope, whose files are the test's own.
 
     Use instead: stage the file and move it into place with one rename. In
@@ -156,7 +162,7 @@ class WriteInPlace(Rule):
 
                 def publish(source, where, log):
                     shutil.copyfile(source, where + '/model.glb')
-                    with open(log, mode='a') as handle:
+                    with open(where + '.json', mode='x') as handle:
                         handle.write('published')
                     gzip.open(where + '.gz', 'wb').close()
                     tarfile.open(where + '.tar', 'w:gz').close()
@@ -188,14 +194,15 @@ class WriteInPlace(Rule):
     def _written(self, node: ast.Call, module: Module) -> tuple[str, ast.expr] | None:
         """What `node` writes and the path it writes to, or None when it does not write."""
         qualified = module.symbols.qualified_name(node.func)
-        if qualified in _OPENERS:
-            where, how, writing = _OPENERS[qualified]
+        openers = _STREAMS if qualified in _STREAMS else _ARCHIVES
+        if qualified in openers:
+            where, how = openers[qualified]
             path, mode = _argument(node, *where), _argument(node, *how)
             if (
                 path is not None
                 and isinstance(mode, ast.Constant)
                 and isinstance(mode.value, str)
-                and set(mode.value) & set(writing)
+                and _rewrites(mode.value, archive=openers is _ARCHIVES)
             ):
                 return '%s(..., %r)' % (ast.unparse(node.func), mode.value), path
             return None
@@ -212,6 +219,18 @@ class WriteInPlace(Rule):
         ):
             return node.func.attr, node.func.value
         return None
+
+
+def _rewrites(mode: str, *, archive: bool) -> bool:
+    """Whether opening with `mode` writes over what the file holds.
+
+    A stream opened to append keeps what it held (a log, a journal, a lock
+    file), and has no staged form; an archive opened to append rewrites its
+    index.
+    """
+    if archive:
+        return bool(set(mode) & set('wax'))
+    return 'w' in mode or 'x' in mode or ('+' in mode and 'a' not in mode)
 
 
 def _argument(node: ast.Call, position: int, keyword: str) -> ast.expr | None:
