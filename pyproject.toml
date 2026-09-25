@@ -69,8 +69,9 @@ openglcontext_checks = ["py.typed"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # `importlib` import mode keeps the suite importing the installed package
-# rather than a same-named directory beside it.
-addopts = "-ra --import-mode=importlib"
+# rather than a same-named directory beside it. The plugin is this package's
+# own: a run of the suite includes one item per rule, over this project.
+addopts = "-ra --import-mode=importlib -p openglcontext_checks.pytest_plugin"
 pythonpath = ["tests"]
 
 [tool.coverage.run]
@@ -80,6 +81,9 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 fail_under = 100
+
+[tool.openglcontext-checks]
+# Every rule, over the whole project.
 
 [tool.ruff]
 line-length = 100
@@ -141,6 +145,12 @@ warn_unused_ignores = false
 [[tool.mypy.overrides]]
 module = ["pytest", "_pytest.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# `approx` names NumPy, whose stubs use syntax newer than the floor this
+# package is checked at. Nothing here uses `approx` or NumPy.
+module = ["_pytest.python_api"]
+follow_imports = "skip"
 
 # uv judges whether its cached metadata for a source tree is current from
 # pyproject.toml alone unless told otherwise, and this project's version lives
