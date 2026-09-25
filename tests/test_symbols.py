@@ -233,3 +233,22 @@ def test_the_enclosing_function_is_the_innermost_one():
     assert symbols.enclosing_function(lambda_body) is outer.body[0].value
     assert symbols.enclosing_function(outer.body[1].value) is outer
     assert symbols.enclosing_function(tree.body[1].value) is None
+
+
+def test_the_binding_scope_is_the_scope_whose_binding_a_name_reads():
+    tree, symbols = _names("""
+        def helper():
+            pass
+        class Case:
+            helper = None
+            def method(self, shadow):
+                helper()
+                shadow()
+                len()
+                nowhere()
+    """)
+    method = tree.body[1].body[1]
+    assert symbols.binding_scope(_call_target(tree, 'helper')) is tree
+    assert symbols.binding_scope(_call_target(tree, 'shadow')) is method
+    assert symbols.binding_scope(_call_target(tree, 'len')) is None
+    assert symbols.binding_scope(_call_target(tree, 'nowhere')) is None

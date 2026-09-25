@@ -109,24 +109,28 @@ class Symbols:
             scope = self._outer[scope]
         return True
 
-    def lookup(self, node: ast.Name) -> Binding:
-        """What the name `node` refers to where it appears."""
-        name = node.id
+    def binding_scope(self, node: ast.Name) -> _Scope | None:
+        """The scope binding the name `node` reads; None for a builtin or unbound name."""
         scope: _Scope | None = self._scopes[node]
         innermost = True
         while scope is not None:
-            if innermost or not isinstance(scope, ast.ClassDef):
-                bound = self._bound[scope]
-                if name in bound:
-                    qualified = bound[name]
-                    if qualified is None:
-                        return Binding(LOCAL)
-                    return Binding(IMPORTED, qualified)
+            if (innermost or not isinstance(scope, ast.ClassDef)) and node.id in self._bound[scope]:
+                return scope
             scope = self._outer[scope]
             innermost = False
-        if name in _BUILTINS:
-            return Binding(BUILTIN, 'builtins.' + name)
-        return Binding(UNBOUND)
+        return None
+
+    def lookup(self, node: ast.Name) -> Binding:
+        """What the name `node` refers to where it appears."""
+        scope = self.binding_scope(node)
+        if scope is None:
+            if node.id in _BUILTINS:
+                return Binding(BUILTIN, 'builtins.' + node.id)
+            return Binding(UNBOUND)
+        qualified = self._bound[scope][node.id]
+        if qualified is None:
+            return Binding(LOCAL)
+        return Binding(IMPORTED, qualified)
 
     def qualified_name(self, node: ast.expr) -> str | None:
         """The dotted name `node` refers to, through imports; None if unknown.
