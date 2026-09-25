@@ -107,6 +107,11 @@ ignore = [
 # shared `# noqa: E501, OGC131 reason` is not reported as naming unknown codes.
 external = ["OGC"]
 
+[tool.ruff.lint.per-file-ignores]
+# A rule written for a test overrides the base class's methods, whose
+# signatures carry the module whether or not that rule reads it.
+"tests/*" = ["ARG002"]
+
 [tool.ruff.format]
 quote-style = "single"
 exclude = ["*.md"]
