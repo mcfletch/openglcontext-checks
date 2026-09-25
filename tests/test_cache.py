@@ -2,11 +2,18 @@
 
 import json
 import os
+import shutil
 
 import pytest
 
-from openglcontext_checks import __version__
-from openglcontext_checks.cache import CACHE_DIRECTORY, ResultCache, entry_key
+import openglcontext_checks
+from openglcontext_checks import cache as cache_module
+from openglcontext_checks.cache import (
+    CACHE_DIRECTORY,
+    ResultCache,
+    entry_key,
+    implementation_digest,
+)
 from openglcontext_checks.findings import Finding
 
 FOUND = [Finding(3, 1, 'OGC131', 'id(x) as a key')]
@@ -30,21 +37,41 @@ def test_a_stored_result_comes_back_for_the_same_key(tmp_path):
     assert again.lookup('b.py', key) is None
 
 
-def test_the_key_covers_content_settings_and_version():
+def test_the_key_covers_content_settings_and_the_rules_themselves(monkeypatch):
     base = entry_key(b'x = 1\n', 'OGC131|')
     assert entry_key(b'x = 1\n', 'OGC131|') == base
     assert entry_key(b'x = 2\n', 'OGC131|') != base
     assert entry_key(b'x = 1\n', 'OGC131,OGC141|') != base
+    # A rule edited in an editable install changes the findings without a new
+    # version number; the key follows the package's source, not its version.
+    monkeypatch.setattr(cache_module, 'implementation', lambda: 'edited rules')
+    assert entry_key(b'x = 1\n', 'OGC131|') != base
 
 
-def test_a_cache_written_by_another_version_is_not_read(tmp_path):
+def test_the_digest_follows_every_source_file_of_the_package(tmp_path):
+    package = os.path.dirname(openglcontext_checks.__file__)
+    copy = tmp_path / 'copy'
+    shutil.copytree(package, copy, ignore=shutil.ignore_patterns('__pycache__'))
+    before = implementation_digest(str(copy))
+    assert implementation_digest(str(copy)) == before
+    rule = copy / 'rules' / 'ogc131_id_key.py'
+    rule.write_text(rule.read_text() + '\n# edited\n')
+    edited = implementation_digest(str(copy))
+    assert edited != before
+    (copy / '__pycache__').mkdir()
+    (copy / '__pycache__' / 'stale.pyc').write_bytes(b'not source')
+    (copy / 'notes.txt').write_text('not source')
+    assert implementation_digest(str(copy)) == edited
+
+
+def test_a_cache_written_by_other_rules_is_not_read(tmp_path):
     cache = ResultCache(str(tmp_path))
     key = entry_key(b'x', 's')
     cache.store('a.py', key, FOUND)
     cache.save()
     path = tmp_path / CACHE_DIRECTORY / 'results.json'
     data = json.loads(path.read_text())
-    assert data['version'] == __version__
+    assert data['version'] == cache_module.implementation()
     data['version'] = '0.0.0'
     path.write_text(json.dumps(data))
     assert ResultCache(str(tmp_path)).lookup('a.py', key) is None
@@ -143,7 +170,12 @@ def test_a_disabled_cache_neither_reads_nor_writes(tmp_path):
 def test_an_entry_of_the_wrong_shape_is_a_miss(tmp_path):
     (tmp_path / CACHE_DIRECTORY).mkdir()
     (tmp_path / CACHE_DIRECTORY / 'results.json').write_text(
-        json.dumps({'version': __version__, 'files': {'a.py': {'key': 'k', 'findings': 7}}})
+        json.dumps(
+            {
+                'version': cache_module.implementation(),
+                'files': {'a.py': {'key': 'k', 'findings': 7}},
+            }
+        )
     )
     assert ResultCache(str(tmp_path)).lookup('a.py', 'k') is None
 

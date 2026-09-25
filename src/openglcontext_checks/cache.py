@@ -2,10 +2,11 @@
 
 One JSON file per project, `.oglc-check-cache/results.json` under the project
 root, maps each checked file's project-relative path to a key and the findings
-reported for it. The key is a hash of the file's bytes, this package's version
-and the settings that decide the file's findings (the codes that run on it and
-the scopes it is in), so an edit, an upgrade or a configuration change each
-make the entry miss. A hit reports the stored findings without reading the
+reported for it. The key is a hash of the file's bytes, of this package's own
+source (which is what decides the findings, and changes in an editable install
+without a new version number) and of the settings that decide the file's
+findings (the codes that run on it and the scopes it is in), so an edit to the
+file, to the rules or to the configuration each make the entry miss. A hit reports the stored findings without reading the
 syntax tree.
 
 The file is replaced whole: written to a temporary file beside it, then moved
@@ -18,6 +19,7 @@ written is reported on standard error and the run carries on.
 from __future__ import annotations
 
 import contextlib
+import functools
 import hashlib
 import json
 import os
@@ -25,17 +27,43 @@ import secrets
 import sys
 from collections.abc import Sequence
 
-from . import __version__
 from .findings import Finding
 
 CACHE_DIRECTORY = '.oglc-check-cache'
 _RESULTS = 'results.json'
 
 
-def entry_key(content: bytes, settings: str) -> str:
-    """The key for a file with `content`, checked under `settings`."""
+_PACKAGE = os.path.dirname(os.path.abspath(__file__))
+
+
+def implementation_digest(directory: str) -> str:
+    """A hash of every Python source file under `directory`, by relative path."""
     digest = hashlib.sha256()
-    for part in (__version__.encode('utf-8'), settings.encode('utf-8'), content):
+    for folder, subfolders, names in os.walk(directory):
+        subfolders[:] = sorted(name for name in subfolders if name != '__pycache__')
+        for name in sorted(names):
+            if not name.endswith('.py'):
+                continue
+            path = os.path.join(folder, name)
+            relative = os.path.relpath(path, directory).replace(os.sep, '/')
+            with open(path, 'rb') as handle:
+                source = handle.read()
+            for part in (relative.encode('utf-8'), source):
+                digest.update(len(part).to_bytes(8, 'little'))
+                digest.update(part)
+    return digest.hexdigest()
+
+
+@functools.cache
+def implementation() -> str:
+    """The digest of this package's source, read once a process."""
+    return implementation_digest(_PACKAGE)
+
+
+def entry_key(content: bytes, settings: str) -> str:
+    """The key for a file with `content`, checked under `settings` by these rules."""
+    digest = hashlib.sha256()
+    for part in (implementation().encode('utf-8'), settings.encode('utf-8'), content):
         digest.update(len(part).to_bytes(8, 'little'))
         digest.update(part)
     return digest.hexdigest()
@@ -82,7 +110,7 @@ class ResultCache:
             for path, entry in sorted(self._entries.items())
             if os.path.exists(os.path.join(self.root, path))
         }
-        text = json.dumps({'version': __version__, 'files': files}, separators=(',', ':'))
+        text = json.dumps({'version': implementation(), 'files': files}, separators=(',', ':'))
         try:
             os.makedirs(self.directory, exist_ok=True)
             ignore = os.path.join(self.directory, '.gitignore')
@@ -103,7 +131,7 @@ class ResultCache:
                 data = json.load(handle)
         except (OSError, ValueError):
             return {}
-        if not isinstance(data, dict) or data.get('version') != __version__:
+        if not isinstance(data, dict) or data.get('version') != implementation():
             return {}
         files = data.get('files')
         return files if isinstance(files, dict) else {}

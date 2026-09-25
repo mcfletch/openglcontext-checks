@@ -106,9 +106,10 @@ ruff's RUF100 (unused `noqa`) tells ruff the codes are another tool's with
 ## The result cache
 
 Each project keeps the findings of its last run in `.oglc-check-cache/` in the
-project root. An entry is keyed on the file's bytes, this package's version,
-and the codes and scopes that apply to the file, so editing the file,
-upgrading the package or changing the configuration each make it miss. An
+project root. An entry is keyed on the file's bytes, this package's own source
+(so an edited rule in an editable install counts, not only a new version),
+and the codes and scopes that apply to the file, so editing the file, changing
+the package or changing the configuration each make it miss. An
 unchanged file is not parsed again, and its stored findings are reported as
 before. The cache file is replaced whole, through a temporary file and one
 rename. The directory holds a `.gitignore` of `*`, so it stays out of version

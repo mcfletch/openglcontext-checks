@@ -22,7 +22,7 @@ compatibility promise.
 - Suppression by `# noqa: CODE reason`, in ruff's syntax; a suppression with
   no reason does not suppress.
 - A per-project result cache in `.oglc-check-cache/`, keyed on each file's
-  bytes, the package version and the settings that apply to it.
+  bytes, the package's own source and the settings that apply to it.
 - Checking across worker processes for a run of 48 or more files to parse.
 - A pytest entry point, `-p openglcontext_checks.pytest_plugin`: one item per
   selected rule in a run of the suite.

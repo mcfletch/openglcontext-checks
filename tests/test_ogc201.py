@@ -30,7 +30,5 @@ def test_its_own_finding_can_be_suppressed_with_a_reason_beside_it():
 def test_text_after_a_type_ignore_is_told_to_move_behind_a_hash():
     (finding,) = _found('x = f()  # type: ignore[attr-defined] the stubs lack it\n')
     assert (finding.line, finding.column) == (1, 10)
-    assert finding.message.startswith(
-        'mypy rejects text after # type: ignore[attr-defined]'
-    )
+    assert finding.message.startswith('mypy rejects text after # type: ignore[attr-defined]')
     assert _found('x = f()  # type: ignore[attr-defined]  # the stubs lack it\n') == []
