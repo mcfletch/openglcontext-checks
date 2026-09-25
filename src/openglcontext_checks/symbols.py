@@ -3,7 +3,7 @@
 One pass over the syntax tree records, for every node, its parent and the
 scope it is evaluated in, and for every scope, the names bound in it and the
 modules star-imported into it. A rule then asks what a name or a dotted
-attribute refers to: `GL.glFinish` after `from OpenGL import GL` is
+attribute is bound to: `GL.glFinish` after `from OpenGL import GL` is
 `OpenGL.GL.glFinish`.
 
 Scopes are the module, each function, lambda and class. A function's
