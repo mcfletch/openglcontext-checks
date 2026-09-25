@@ -273,7 +273,9 @@ for node in walk(root):
 A call inside a `__del__` method to a function of `OpenGL.GL`, an
 `OpenGL.GLES*` module or their `OpenGL.raw` forms, through any import form;
 after a star import from one of those, an unbound name spelled `gl` and a
-capital letter. A finaliser runs on whichever thread collects the object,
+capital letter; and a parameter whose default is one of those functions
+(`def __del__(self, glDeleteLists=glDeleteLists)`), unless the body rebinds
+it. A finaliser runs on whichever thread collects the object,
 with whatever context is current there or none. Queue the release for the
 context that owns the name, and delete it there.
 

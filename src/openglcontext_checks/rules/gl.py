@@ -52,7 +52,7 @@ def _parameter_default(name: ast.Name, symbols: Symbols) -> ast.expr | None:
     positional = [*arguments.posonlyargs, *arguments.args]
     defaults: dict[str, ast.expr] = dict(
         zip(
-            (argument.arg for argument in positional[len(positional) - len(arguments.defaults):]),
+            (argument.arg for argument in positional[len(positional) - len(arguments.defaults) :]),
             arguments.defaults,
             strict=True,
         )

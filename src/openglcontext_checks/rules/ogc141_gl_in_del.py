@@ -28,7 +28,9 @@ class GlInDel(Rule):
     form (`import OpenGL.GL as GL`, `from OpenGL import GL`,
     `from OpenGL.GL import glDeleteTextures`). After a star import from one of
     those modules, a name spelled `gl` and a capital letter that nothing in
-    the module binds counts too. A lambda or function defined inside
+    the module binds counts too, as does a parameter whose default is one of
+    those functions and which the body never rebinds (`def __del__(self,
+    glDeleteLists=glDeleteLists)`). A lambda or function defined inside
     `__del__` is not the finaliser's own call and is not reported.
 
     Use instead: queue the release for the context that owns the name, and
@@ -160,7 +162,7 @@ class GlInDel(Rule):
                 from OpenGL.GL import *
 
                 class Lists:
-                    def __del__(self, delete=glDeleteLists, *, finish=glFinish):
+                    def __del__(self, delete=glDeleteLists, *, keep=None, name, finish=glFinish):
                         delete(self.list, 1)
                         finish()
             """),

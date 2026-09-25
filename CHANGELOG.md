@@ -51,3 +51,5 @@ compatibility promise.
   them.
 - The `sanctioned` configuration key: a project's own API for the rules that
   point at one, by rule code and qualified name, in place of OpenGLContext's.
+- OGC141 counts a call to a parameter whose default is an OpenGL function
+  (`def __del__(self, glDeleteLists=glDeleteLists)`).
