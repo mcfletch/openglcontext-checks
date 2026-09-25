@@ -1,5 +1,6 @@
 """`oglc-check`: what it checks, what it prints and how it exits."""
 
+import io
 import os
 import textwrap
 
@@ -199,7 +200,6 @@ def test_a_dot_directory_is_skipped_unless_it_is_named(project, capsys):
 
 def test_a_reader_that_stops_early_is_not_an_error(project, monkeypatch):
     """`oglc-check | head` closes the pipe while findings are still printing."""
-    import io
 
     class ClosedPipe(io.StringIO):
         def write(self, text):

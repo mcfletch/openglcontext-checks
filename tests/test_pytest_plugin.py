@@ -5,6 +5,8 @@ import textwrap
 
 import pytest
 
+from openglcontext_checks import pytest_plugin as plugin
+
 PLUGIN = ('-p', 'openglcontext_checks.pytest_plugin')
 KEYED = 'cache = {}\ndef fit(mesh):\n    cache[id(mesh)] = 1\n'
 PASSING = 'def test_passes():\n    assert True\n'
@@ -87,8 +89,6 @@ def test_the_items_report_where_they_come_from(project):
 
 
 def test_another_failure_inside_an_item_is_reported_as_pytest_would(project, monkeypatch):
-    import openglcontext_checks.pytest_plugin as plugin
-
     def broken(*_args, **_kwargs):
         raise RuntimeError('the runner broke')
 

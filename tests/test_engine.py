@@ -1,9 +1,12 @@
 """Parsing a module, running rules over it and applying suppressions."""
 
 import ast
+import unittest.mock
+import warnings
 
 import pytest
 
+from openglcontext_checks import engine
 from openglcontext_checks.engine import ParseError, check_source, parse_module, run_rules
 from openglcontext_checks.findings import Finding
 from openglcontext_checks.rules.base import Rule
@@ -152,9 +155,6 @@ def test_a_null_byte_is_an_error_on_every_supported_python():
 
 def test_an_error_without_a_position_is_placed_at_the_start():
     """The tokenizer's own errors carry no line or offset attributes."""
-    import unittest.mock
-
-    import openglcontext_checks.engine as engine
 
     def refuse(_source):
         raise engine.tokenize.TokenError('EOF in multi-line statement')
@@ -170,8 +170,6 @@ def test_an_error_without_a_position_is_placed_at_the_start():
 
 def test_a_syntax_warning_in_the_checked_source_is_not_raised():
     """An invalid escape is a warning from the compiler, and the module still parses."""
-    import warnings
-
     with warnings.catch_warnings():
         warnings.simplefilter('error')
         module = parse_module(b"pattern = '\\d+'\n", 'escape.py')
