@@ -217,8 +217,12 @@ method of a module-level class) whose body, less nested definitions, has no
 `assert`, no `raise` of an exception, no `pytest.raises`, `pytest.warns`,
 `pytest.fail` or `pytest.deprecated_call`, and no call to a function or method
 named `fail` or starting with `assert`, `check`, `expect` or `verify` (leading
-underscores aside). Such a test fails only if something raises. Assert on the
-result, or use `pytest.raises`; a helper that asserts is named for it.
+underscores aside). A call to a helper defined in the same module counts when
+the helper asserts, followed through the helpers it calls: a module-level
+function called by the name its `def` binds, or a method called on the test's
+`self`, from the test's class or a base class defined in the module. Such a
+test fails only if something raises. Assert on the result, or use
+`pytest.raises`; a helper from another module that asserts is named for it.
 
 ```python
 def test_draws():

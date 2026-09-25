@@ -26,3 +26,6 @@ compatibility promise.
 - Checking across worker processes for a run of 48 or more files to parse.
 - A pytest entry point, `-p openglcontext_checks.pytest_plugin`: one item per
   selected rule in a run of the suite.
+- OGC222 follows a test's calls to helpers defined in its own module, so a
+  test whose assertion is in `_close(found, wanted)` or `self._is_inverse(m)`
+  is not reported.
