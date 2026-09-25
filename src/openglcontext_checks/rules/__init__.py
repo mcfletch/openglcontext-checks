@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from .base import Invalid, Rule, snippet
 from .ogc131_id_key import IdAsKey
+from .ogc141_gl_in_del import GlInDel
 
 #: One instance of every rule, in code order. Rules hold no state.
-ALL_RULES: tuple[Rule, ...] = (IdAsKey(),)
+ALL_RULES: tuple[Rule, ...] = (IdAsKey(), GlInDel())
 
 #: Each rule by its code.
 RULES: dict[str, Rule] = {rule.code: rule for rule in ALL_RULES}
