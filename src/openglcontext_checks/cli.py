@@ -2,6 +2,7 @@
 
     oglc-check                        # the project's configured paths
     oglc-check src/pkg/module.py      # just these files or directories
+    oglc-check --force-exclude FILE   # FILE only if the configuration covers it
     oglc-check --statistics           # how many findings of each rule
     oglc-check --select OGC131,OGC2   # these rules only
     oglc-check --ignore OGC222        # all but these
@@ -46,6 +47,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         '--statistics', action='store_true', help='print the number of findings of each rule'
     )
+    parser.add_argument(
+        '--force-exclude',
+        action='store_true',
+        help='pass over a named path the configuration leaves out (outside `paths`, or excluded)',
+    )
     parser.add_argument('--no-cache', action='store_true', help='neither read nor write the cache')
     parser.add_argument(
         '--jobs',
@@ -62,7 +68,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             select=_codes(options.select) if options.select is not None else None,
             ignore=_codes(options.ignore) if options.ignore is not None else [],
         )
-        files = discover(config, options.paths or None, cwd)
+        files = discover(config, options.paths or None, cwd, force_exclude=options.force_exclude)
     except ConfigError as error:
         print('oglc-check: %s' % (error,), file=sys.stderr)
         return 2

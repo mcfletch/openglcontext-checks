@@ -17,6 +17,9 @@ compatibility promise.
 - `oglc-check [paths]`, printing `path:line:column: CODE message`, with
   `--statistics`, `--select`, `--ignore`, `--no-cache` and `--jobs`. Exit
   status 0 clean, 1 findings, 2 usage, configuration or parse error.
+- `--force-exclude`: a path named on the command line that is outside the
+  project, outside `paths` or excluded is passed over, as a run with no
+  arguments would pass over it.
 - Configuration in `[tool.openglcontext-checks]`: `paths`, `select`,
   `ignore`, `exclude`, `per-file-ignores` and `scopes`.
 - Suppression by `# noqa: CODE reason`, in ruff's syntax; a suppression with

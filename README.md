@@ -20,6 +20,7 @@ tests/test_render.py:12:1: OGC222 test_draws has no assertion: it passes whateve
 ```console
 $ oglc-check                        # the project's configured paths
 $ oglc-check src/pkg/module.py      # just these files or directories
+$ oglc-check --force-exclude FILE   # FILE, if a run with no arguments would check it
 $ oglc-check --statistics           # how many findings of each rule
 $ oglc-check --select OGC131,OGC2   # these rules only (codes or prefixes)
 $ oglc-check --ignore OGC222        # all but these
@@ -87,6 +88,12 @@ Files and directories whose names start with a dot are not checked
 `site-packages`. The package does not read `.gitignore`. A path named on the
 command line or in `paths` is checked even when an exclusion matches it;
 exclusions apply to what is found beneath it.
+
+`--force-exclude` holds the paths named on the command line to the
+configuration as well: a path outside the project, outside `paths`, or
+matched by an exclusion is passed over. An editor or a hook that hands over
+every file it touched uses it, so that what it checks is what the project's
+own run checks.
 
 ## Suppressing a finding
 

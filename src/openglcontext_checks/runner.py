@@ -44,13 +44,18 @@ class Report:
     parsed: int
 
 
-def discover(config: Config, paths: Sequence[str] | None, cwd: str) -> list[str]:
+def discover(
+    config: Config, paths: Sequence[str] | None, cwd: str, *, force_exclude: bool = False
+) -> list[str]:
     """The absolute paths of the Python files to check, sorted.
 
     With no `paths`, the configuration's own, relative to the project root;
     otherwise `paths`, relative to `cwd`. A directory contributes every `.py`
     file beneath it that the configuration does not exclude, and a file is
-    taken as named, whatever the exclusions say. Raises `ConfigError` for a
+    taken as named, whatever the exclusions say. With `force_exclude`, a named
+    path is held to the configuration as though a run with no arguments had
+    found it: one outside the configured `paths`, outside the project, or
+    matched by an exclusion contributes nothing. Raises `ConfigError` for a
     path that does not exist.
     """
     if paths is None:
@@ -61,6 +66,12 @@ def discover(config: Config, paths: Sequence[str] | None, cwd: str) -> list[str]
     for path in named:
         path = os.path.normpath(path)
         below = _relative(config, path)
+        if force_exclude and paths is not None:
+            if not os.path.exists(path):
+                raise ConfigError('no such file or directory: %s' % (path,))
+            if not config.covers(below):
+                continue
+            below = ''
         if os.path.isdir(path):
             for directory, subdirectories, files in os.walk(path):
                 subdirectories[:] = sorted(

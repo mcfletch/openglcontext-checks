@@ -88,3 +88,61 @@ def test_a_parse_error_survives_the_trip_from_a_worker():
 
     error = pickle.loads(pickle.dumps(ParseError('x.py', 3, 4, 'invalid syntax')))
     assert (error.path, error.line, error.column, error.message) == ('x.py', 3, 4, 'invalid syntax')
+
+
+@pytest.fixture
+def configured(tmp_path):
+    """A project that names its paths and excludes a directory inside them."""
+    (tmp_path / 'pyproject.toml').write_text(
+        '[project]\nname = "p"\n[tool.openglcontext-checks]\n'
+        'paths = ["src"]\nexclude = ["src/generated"]\n'
+    )
+    for name in ('src/pkg/a.py', 'src/generated/b.py', 'docs/conf.py'):
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text('x = 1\n')
+    return tmp_path
+
+
+def test_a_named_file_is_checked_whatever_the_configuration_says(configured):
+    config = load_config(str(configured))
+    named = ['src/pkg/a.py', 'src/generated/b.py', 'docs/conf.py']
+    assert discover(config, named, str(configured)) == sorted(
+        str(configured / name) for name in named
+    )
+
+
+def test_force_exclude_keeps_a_named_file_the_configuration_would_check(configured):
+    config = load_config(str(configured))
+    files = discover(config, ['src/pkg/a.py'], str(configured), force_exclude=True)
+    assert files == [str(configured / 'src/pkg/a.py')]
+
+
+@pytest.mark.parametrize('name', ['src/generated/b.py', 'src/generated', 'docs/conf.py', 'docs'])
+def test_force_exclude_drops_a_named_path_the_configuration_leaves_out(configured, name):
+    config = load_config(str(configured))
+    assert discover(config, [name], str(configured), force_exclude=True) == []
+
+
+def test_force_exclude_drops_a_path_outside_the_project(configured, tmp_path_factory):
+    elsewhere = tmp_path_factory.mktemp('elsewhere') / 'c.py'
+    elsewhere.write_text('x = 1\n')
+    config = load_config(str(configured))
+    assert discover(config, [str(elsewhere)], str(configured), force_exclude=True) == []
+
+
+def test_force_exclude_walks_a_named_directory_with_every_exclusion(configured):
+    config = load_config(str(configured))
+    files = discover(config, ['src'], str(configured), force_exclude=True)
+    assert files == [str(configured / 'src/pkg/a.py')]
+
+
+def test_force_exclude_keeps_everything_where_the_paths_are_the_whole_project(root):
+    config = load_config(str(root))
+    assert discover(config, ['a.py'], str(root), force_exclude=True) == [str(root / 'a.py')]
+
+
+def test_force_exclude_still_refuses_a_missing_path(configured):
+    with pytest.raises(ConfigError, match='no such file or directory'):
+        discover(
+            load_config(str(configured)), ['docs/gone.py'], str(configured), force_exclude=True
+        )

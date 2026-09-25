@@ -214,3 +214,14 @@ def test_a_reader_that_stops_early_is_not_an_error(project, monkeypatch):
     monkeypatch.setattr(cli.os, 'dup2', lambda _source, target: redirected.append(target))
     assert cli.main([]) == 1
     assert redirected == [99]
+
+
+def test_force_exclude_passes_over_a_named_file_the_configuration_leaves_out(project, capsys):
+    project(
+        {'src/a.py': KEYED, 'scratch/b.py': KEYED},
+        '[tool.openglcontext-checks]\npaths = ["src"]\n',
+    )
+    assert _run(capsys, '--force-exclude', 'scratch/b.py') == (0, [], '')
+    code, lines, _err = _run(capsys, '--force-exclude', 'src/a.py')
+    assert code == 1
+    assert lines[0].startswith('src/a.py:3:11: OGC131')

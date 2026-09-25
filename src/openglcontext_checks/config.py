@@ -122,6 +122,20 @@ class Config:
             for pattern in (*DEFAULT_EXCLUDE, *self.exclude)
         )
 
+    def covers(self, path: str) -> bool:
+        """Whether a run with no arguments reaches the project-relative `path`.
+
+        It must be inside one of the configured `paths` and matched by no
+        exclusion. A path outside the project root is not covered.
+        """
+        if path == '..' or path.startswith('../'):
+            return False
+        inside = any(
+            base in ('.', '') or path == base or path.startswith(base + '/')
+            for base in (configured.removeprefix('./').rstrip('/') for configured in self.paths)
+        )
+        return inside and not self.is_excluded(path)
+
     def settings_for(self, path: str) -> str:
         """Everything in the configuration that decides `path`'s findings, as text."""
         return '%s|%s' % (
