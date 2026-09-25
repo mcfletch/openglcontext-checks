@@ -101,10 +101,29 @@ def test_source_that_does_not_parse_is_an_error_with_a_position():
     assert 'broken.py:1:' in str(caught.value)
 
 
-def test_source_that_does_not_tokenize_is_an_error():
-    """`ast` accepts a null byte here and the tokenizer does not."""
-    with pytest.raises(ParseError):
+def test_a_null_byte_is_an_error_on_every_supported_python():
+    """A ValueError from `ast` up to 3.11, a SyntaxError from 3.12 on."""
+    with pytest.raises(ParseError) as caught:
         parse_module(b'x = 1\n\x00\n', 'nul.py')
+    assert str(caught.value).startswith('nul.py:')
+
+
+def test_an_error_without_a_position_is_placed_at_the_start():
+    """The tokenizer's own errors carry no line or offset attributes."""
+    import unittest.mock
+
+    import openglcontext_checks.engine as engine
+
+    def refuse(_source):
+        raise engine.tokenize.TokenError('EOF in multi-line statement')
+
+    with (
+        unittest.mock.patch.object(engine, 'read_pragmas', refuse),
+        pytest.raises(ParseError) as caught,
+    ):
+        parse_module(b'x = 1\n', 'odd.py')
+    assert (caught.value.line, caught.value.column) == (1, 1)
+    assert 'EOF in multi-line statement' in caught.value.message
 
 
 def test_a_syntax_warning_in_the_checked_source_is_not_raised():

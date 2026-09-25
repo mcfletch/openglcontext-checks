@@ -52,10 +52,13 @@ def parse_module(source: bytes, path: str, scopes: frozenset[str] = frozenset())
             warnings.simplefilter('ignore')
             tree = ast.parse(source, filename=path)
         pragmas = read_pragmas(source)
-    except SyntaxError as error:
-        raise ParseError(path, error.lineno or 1, error.offset or 1, error.msg) from error
-    except (tokenize.TokenError, ValueError) as error:
-        raise ParseError(path, 1, 1, str(error)) from error
+    except (SyntaxError, ValueError, tokenize.TokenError) as error:
+        # A null byte is a ValueError from `ast` before Python 3.12 and a
+        # SyntaxError from it after; the position is there when one is known.
+        line = getattr(error, 'lineno', None) or 1
+        column = getattr(error, 'offset', None) or 1
+        message = getattr(error, 'msg', None) or str(error)
+        raise ParseError(path, line, column, message) from error
     return Module(path, tree, Symbols(tree), tuple(pragmas), scopes)
 
 

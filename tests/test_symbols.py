@@ -190,3 +190,13 @@ def test_a_deeply_nested_expression_does_not_exhaust_the_stack():
     tree = ast.parse(source)
     symbols = Symbols(tree)
     assert symbols.scope_of(tree.body[0].value) is tree
+
+
+def test_a_star_import_in_a_class_body_is_not_seen_from_its_methods():
+    tree, symbols = _names("""
+        class Holder:
+            from OpenGL.GL import *
+            def method(self):
+                glFinish()
+    """)
+    assert symbols.star_modules(_call_target(tree, 'glFinish')) == ()

@@ -95,3 +95,8 @@ def test_only_a_reasoned_noqa_naming_the_code_suppresses_it():
     assert not Pragma(NOQA, 1, 1, ('OGC131',), '').suppresses('OGC131')
     assert not Pragma(NOQA, 1, 1, (), 'blanket').suppresses('OGC131')
     assert not Pragma(TYPE_IGNORE, 1, 1, ('OGC131',), 'held').suppresses('OGC131')
+
+
+def test_a_following_comment_with_no_words_is_not_a_reason():
+    (pragma,) = read_pragmas(b'x = 1  # noqa: E501  # --\n')
+    assert pragma.reason == ''
