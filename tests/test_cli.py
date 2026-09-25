@@ -195,3 +195,22 @@ def test_a_dot_directory_is_skipped_unless_it_is_named(project, capsys):
     assert [line.split(':')[0] for line in _run(capsys, '.hidden')[1]] == [
         os.path.join('.hidden', 'tool.py')
     ]
+
+
+def test_a_reader_that_stops_early_is_not_an_error(project, monkeypatch):
+    """`oglc-check | head` closes the pipe while findings are still printing."""
+    import io
+
+    class ClosedPipe(io.StringIO):
+        def write(self, text):
+            raise BrokenPipeError(32, 'Broken pipe')
+
+        def fileno(self):
+            return 99
+
+    project({'a.py': KEYED, 'b.py': KEYED})
+    redirected = []
+    monkeypatch.setattr(cli.sys, 'stdout', ClosedPipe())
+    monkeypatch.setattr(cli.os, 'dup2', lambda _source, target: redirected.append(target))
+    assert cli.main([]) == 1
+    assert redirected == [99]

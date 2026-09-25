@@ -70,13 +70,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     report = check_files(config, files, cwd=cwd, cache=not options.no_cache, jobs=options.jobs)
     for problem in report.errors:
         print(problem, file=sys.stderr)
-    if options.statistics:
-        counts = collections.Counter(finding.code for _path, finding in report.findings)
-        for code, count in sorted(counts.items()):
-            print('%5d  %s  %s' % (count, code, RULES[code].name))
-    else:
-        for path, finding in report.findings:
-            print(finding.format(path))
+    try:
+        if options.statistics:
+            counts = collections.Counter(finding.code for _path, finding in report.findings)
+            for code, count in sorted(counts.items()):
+                print('%5d  %s  %s' % (count, code, RULES[code].name))
+        else:
+            for path, finding in report.findings:
+                print(finding.format(path))
+    except BrokenPipeError:
+        # The reader stopped reading (`oglc-check | head`). Standard output is
+        # pointed at the null device, so the flush at exit does not raise too.
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        os.close(devnull)
     if report.errors:
         return 2
     return 1 if report.findings else 0
