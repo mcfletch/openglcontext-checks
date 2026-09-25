@@ -11,8 +11,10 @@ Keys:
 - `paths`: what a run with no arguments checks (default `["."]`).
 - `select`: rule codes or code prefixes to run (default: every rule).
 - `ignore`: codes or prefixes taken out of `select`.
-- `exclude`: globs never checked, added to the build, cache and environment
-  directories that never are.
+- `exclude`: globs not checked, added to the dot-directories and the build and
+  environment directories that are not. A path named on the command line or
+  in `paths` is checked even where an exclusion matches it; exclusions apply
+  to what is found beneath it.
 - `per-file-ignores`: a table of glob to codes not run on the files it matches.
 - `scopes`: a table of scope name to globs; the `test` scope, which OGC221 to
   OGC223 run in, defaults to `tests/**`, `**/test_*.py`, `**/*_test.py` and
@@ -39,22 +41,14 @@ else:  # pragma: no cover - Python 3.10, where tomli stands in for tomllib
 
 TABLE = 'openglcontext-checks'
 
-#: Never checked, in any project: tool caches, environments and build output.
+#: Never checked, in any project, unless named: every file or directory whose
+#: name starts with a dot (version control, tool caches, virtualenvs, agents'
+#: worktrees), and the usual environment and build directories.
 DEFAULT_EXCLUDE = (
-    '.git',
-    '.hg',
-    '.svn',
-    '.tox',
-    '.nox',
-    '.venv',
+    '.*',
     'venv',
-    '.eggs',
     '*.egg-info',
     '__pycache__',
-    '.mypy_cache',
-    '.ruff_cache',
-    '.pytest_cache',
-    '.oglc-check-cache',
     '_build',
     'build',
     'dist',
@@ -113,9 +107,18 @@ class Config:
             if any(matches(pattern, path) for pattern in patterns)
         )
 
-    def is_excluded(self, path: str) -> bool:
-        """Whether the project-relative `path` is never checked."""
-        return any(matches(pattern, path) for pattern in (*DEFAULT_EXCLUDE, *self.exclude))
+    def is_excluded(self, path: str, named: str = '') -> bool:
+        """Whether the project-relative `path` is left out.
+
+        `named` is the path the caller named that `path` was found under (or
+        is): a pattern that matches it matched because it was named, and does
+        not exclude anything beneath it.
+        """
+        named = '' if named == '.' else named
+        return any(
+            matches(pattern, path) and not (named and matches(pattern, named))
+            for pattern in (*DEFAULT_EXCLUDE, *self.exclude)
+        )
 
     def settings_for(self, path: str) -> str:
         """Everything in the configuration that decides `path`'s findings, as text."""

@@ -118,9 +118,16 @@ def test_configured_paths_and_exclusions_decide_an_unnamed_run(project, capsys):
     assert [line.split(':')[0] for line in _run(capsys)[1]] == ['src/a.py']
 
 
-def test_an_excluded_file_is_skipped_even_when_named(project, capsys):
-    project({'build/d.py': KEYED})
-    assert _run(capsys, 'build/d.py')[0] == 0
+def test_a_named_path_is_checked_whatever_the_exclusions_say(project, capsys):
+    """As ruff does: naming a path is asking for it."""
+    project({'build/d.py': KEYED, 'build/sub/.cache/e.py': KEYED})
+    assert _run(capsys)[0] == 0
+    assert [line.split(':')[0] for line in _run(capsys, 'build/d.py')[1]] == [
+        os.path.join('build', 'd.py')
+    ]
+    assert [line.split(':')[0] for line in _run(capsys, 'build')[1]] == [
+        os.path.join('build', 'd.py')
+    ]
 
 
 def test_a_run_from_a_subdirectory_prints_paths_from_there(project, capsys, monkeypatch):
@@ -179,3 +186,12 @@ def test_an_unknown_option_is_a_usage_error(capsys):
         cli.main(['--frobnicate'])
     assert caught.value.code == 2
     assert 'usage' in capsys.readouterr().err
+
+
+def test_a_dot_directory_is_skipped_unless_it_is_named(project, capsys):
+    """Tool state, virtualenvs and worktrees live in them."""
+    project({'.claude/worktrees/b/a.py': KEYED, '.hidden/tool.py': KEYED})
+    assert _run(capsys)[0] == 0
+    assert [line.split(':')[0] for line in _run(capsys, '.hidden')[1]] == [
+        os.path.join('.hidden', 'tool.py')
+    ]

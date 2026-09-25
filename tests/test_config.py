@@ -94,6 +94,8 @@ def test_exclude_adds_to_the_directories_never_checked(tmp_path):
     assert config.is_excluded('generated/x.py')
     assert config.is_excluded('.venv/lib/x.py')
     assert config.is_excluded('pkg/__pycache__')
+    assert config.is_excluded('.claude/worktrees/branch/src/x.py')
+    assert config.is_excluded('docs/.samples/demo.py')
     assert not config.is_excluded('src/x.py')
 
 
@@ -163,3 +165,12 @@ def test_the_nearest_pyproject_is_the_root_when_none_has_the_table(tmp_path):
     _project(inner, '[project]\nname = "inner"\n')
     config = load_config(str(inner))
     assert (config.root, config.source) == (str(inner), str(inner / 'pyproject.toml'))
+
+
+def test_a_named_path_lifts_the_exclusions_that_match_it(tmp_path):
+    _project(tmp_path, '[tool.openglcontext-checks]\nexclude = ["generated"]\n')
+    config = load_config(str(tmp_path))
+    assert config.is_excluded('.claude/skills/scan.py')
+    assert not config.is_excluded('.claude/skills/scan.py', '.claude/skills')
+    assert config.is_excluded('.claude/skills/generated/x.py', '.claude/skills')
+    assert config.is_excluded('generated/x.py', '.')

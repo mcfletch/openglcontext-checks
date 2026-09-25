@@ -49,9 +49,9 @@ def discover(config: Config, paths: Sequence[str] | None, cwd: str) -> list[str]
 
     With no `paths`, the configuration's own, relative to the project root;
     otherwise `paths`, relative to `cwd`. A directory contributes every `.py`
-    file beneath it and a file is taken as named; the configuration's
-    exclusions apply to both. Raises `ConfigError` for a path that does not
-    exist.
+    file beneath it that the configuration does not exclude, and a file is
+    taken as named, whatever the exclusions say. Raises `ConfigError` for a
+    path that does not exist.
     """
     if paths is None:
         named = [os.path.join(config.root, path) for path in config.paths]
@@ -60,21 +60,27 @@ def discover(config: Config, paths: Sequence[str] | None, cwd: str) -> list[str]
     found: set[str] = set()
     for path in named:
         path = os.path.normpath(path)
+        below = _relative(config, path)
         if os.path.isdir(path):
             for directory, subdirectories, files in os.walk(path):
                 subdirectories[:] = sorted(
                     name
                     for name in subdirectories
-                    if not config.is_excluded(_relative(config, os.path.join(directory, name)))
+                    if not config.is_excluded(
+                        _relative(config, os.path.join(directory, name)), below
+                    )
                 )
                 found.update(
-                    os.path.join(directory, name) for name in files if name.endswith('.py')
+                    candidate
+                    for candidate in (os.path.join(directory, name) for name in files)
+                    if candidate.endswith('.py')
+                    and not config.is_excluded(_relative(config, candidate), below)
                 )
         elif os.path.exists(path):
             found.add(path)
         else:
             raise ConfigError('no such file or directory: %s' % (path,))
-    return sorted(path for path in found if not config.is_excluded(_relative(config, path)))
+    return sorted(found)
 
 
 def check_files(
