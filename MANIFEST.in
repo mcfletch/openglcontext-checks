@@ -1,0 +1,4 @@
+# The suite runs from the unpacked sdist, helpers and all; setuptools on its
+# own carries only tests/test*.py.
+graft tests
+global-exclude __pycache__ *.py[cod]

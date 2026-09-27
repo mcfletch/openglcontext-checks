@@ -144,7 +144,10 @@ def test_appending_to_an_archive_rewrites_its_index_in_place():
     ],
 )
 def test_a_path_opened_to_write_by_its_own_method_is_reported(call):
-    source = 'import pathlib\ndef save(self, where):\n    with %s as handle:\n        handle.write("x")\n' % (call,)
+    source = (
+        'import pathlib\ndef save(self, where):\n    with %s as handle:\n        handle.write("x")\n'
+        % (call,)
+    )
     assert len(_found(source)) == 1
 
 

@@ -45,6 +45,8 @@ test = [
     "coverage[toml]>=7",
     # The mypy plugin is tested by running mypy over small projects.
     "mypy>=1.10",
+    # The sdist is built to check that it carries the suite.
+    "setuptools>=77",
 ]
 dev = [
     "openglcontext-checks[test]",

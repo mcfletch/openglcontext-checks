@@ -52,9 +52,11 @@ from collections.abc import Iterable, Mapping, Sequence
 from .globs import matches
 from .rules import ALL_RULES, RULES
 
-if sys.version_info >= (3, 11):
+# tomli stands in for tomllib on Python 3.10. Each interpreter runs one of the
+# two imports, so both are left out of the coverage count.
+if sys.version_info >= (3, 11):  # pragma: no cover - Python 3.11 and later
     import tomllib
-else:  # pragma: no cover - Python 3.10, where tomli stands in for tomllib
+else:  # pragma: no cover - Python 3.10
     import tomli as tomllib
 
 TABLE = 'openglcontext-checks'
