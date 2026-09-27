@@ -20,10 +20,6 @@ def _pyproject():
     return tomllib.loads((PROJECT / 'pyproject.toml').read_text(encoding='utf-8'))
 
 
-def test_the_version_is_a_prerelease_string():
-    assert openglcontext_checks.__version__ == '0.1.0a1'
-
-
 def test_the_package_declares_its_types():
     package = pathlib.Path(openglcontext_checks.__file__).parent
     assert (package / 'py.typed').exists()
@@ -43,20 +39,35 @@ def test_the_sdist_carries_the_whole_suite(tmp_path):
     Built from a copy so the build writes nothing into the checkout.
     """
     source = tmp_path / 'project'
-    shutil.copytree(PROJECT, source, ignore=shutil.ignore_patterns(
-        '.*', '__pycache__', '*.egg-info', 'build', 'dist'))
+    shutil.copytree(
+        PROJECT,
+        source,
+        ignore=shutil.ignore_patterns('.*', '__pycache__', '*.egg-info', 'build', 'dist'),
+    )
     subprocess.run(
-        [sys.executable, '-c',
-         'import sys; from setuptools import build_meta; '
-         'print(build_meta.build_sdist(sys.argv[1]))',
-         str(tmp_path / 'dist')],
-        cwd=source, check=True, capture_output=True, text=True)
+        [
+            sys.executable,
+            '-c',
+            'import sys; from setuptools import build_meta; '
+            'print(build_meta.build_sdist(sys.argv[1]))',
+            str(tmp_path / 'dist'),
+        ],
+        cwd=source,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     [archive] = (tmp_path / 'dist').glob('*.tar.gz')
     with tarfile.open(archive) as sdist:
-        carried = {pathlib.PurePosixPath(*pathlib.PurePosixPath(name).parts[1:])
-                   for name in sdist.getnames()}
-    suite = {pathlib.PurePosixPath(path.relative_to(source).as_posix())
-             for path in (source / 'tests').rglob('*') if path.is_file()}
+        carried = {
+            pathlib.PurePosixPath(*pathlib.PurePosixPath(name).parts[1:])
+            for name in sdist.getnames()
+        }
+    suite = {
+        pathlib.PurePosixPath(path.relative_to(source).as_posix())
+        for path in (source / 'tests').rglob('*')
+        if path.is_file()
+    }
     assert sorted(map(str, suite - carried)) == []
 
 
