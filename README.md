@@ -37,7 +37,7 @@ parse; a file that does not parse is named on standard error.
 `--select` replaces the configured selection and `--ignore` adds to the
 configured ignores. `--jobs N` sets the number of worker processes; a run
 with 48 or more files to parse spreads them over up to eight processes by
-default, and a smaller run uses one.
+default, and a smaller run uses one whatever `--jobs` says.
 
 Over the 514 modules of `OpenGLContext/` (138,000 lines) on a 32-core machine,
 a run with nothing cached takes 0.24 s (0.87 s in one process), and a run

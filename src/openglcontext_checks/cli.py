@@ -57,7 +57,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         '--jobs',
         type=int,
         metavar='N',
-        help='worker processes for a large run (default: CPUs, up to 8)',
+        help='worker processes for a run of 48 files or more (default: CPUs, up to 8)',
     )
     parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
     options = parser.parse_args(argv)
