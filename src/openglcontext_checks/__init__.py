@@ -6,4 +6,4 @@ command line, and ``-p openglcontext_checks.pytest_plugin`` runs them as part
 of a project's test suite.
 """
 
-__version__ = '0.1.0a1'
+__version__ = '0.1.0a2'
