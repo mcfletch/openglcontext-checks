@@ -40,6 +40,9 @@ _COPIES: dict[str, tuple[int, str]] = {
 #: `pathlib.Path`'s methods that replace a file's content.
 _PATH_WRITES = frozenset({'write_text', 'write_bytes'})
 
+#: The letters an `open` mode is made of; a literal with any other is a name.
+_MODE_LETTERS = frozenset('rwxabt+')
+
 #: The calls whose result is a directory or file only this process writes.
 _TEMPORARY = frozenset({'tempfile.mkdtemp', 'tempfile.mkstemp', 'tempfile.TemporaryDirectory'})
 
@@ -54,8 +57,9 @@ class WriteInPlace(Rule):
     and `lzma.open` with a literal mode that writes over what the file holds
     (`w`, `x`, or `+` other than to append), `tarfile.open` and
     `zipfile.ZipFile` with a mode that writes (`w`, `a` or `x`); `shutil.copy`, `copy2`, `copyfile`
-    and `copytree` to a destination; and `write_text` or `write_bytes` called
-    on anything that is not an imported module (a `pathlib.Path`). A write
+    and `copytree` to a destination; and `write_text`, `write_bytes`, or
+    `open` with a literal mode that writes, called on anything that is not an
+    imported module (a `pathlib.Path`). A write
     cut short (a full disk, a crash, Ctrl-C, a killed thread) leaves part of
     the file, and the next run takes it for the whole: a cache entry, a
     record, a settings file, an install marker.
@@ -178,11 +182,11 @@ class WriteInPlace(Rule):
         written = self._written(node, module)
         if written is None:
             return
-        what, path = written
+        what, path, method = written
         stagers = frozenset(self.sanctioned_names(module)) | _TEMPORARY
         if all(_staged(found, stagers, module) for found in base(path, symbols)):
             return
-        if _renamed(path, node, module, methods=what in _PATH_WRITES):
+        if _renamed(path, node, module, methods=method):
             return
         yield self.finding(
             node,
@@ -191,8 +195,9 @@ class WriteInPlace(Rule):
             '(%s)' % (what, ast.unparse(path), ' or '.join(self.sanctioned_names(module))),
         )
 
-    def _written(self, node: ast.Call, module: Module) -> tuple[str, ast.expr] | None:
-        """What `node` writes and the path it writes to, or None when it does not write."""
+    def _written(self, node: ast.Call, module: Module) -> tuple[str, ast.expr, bool] | None:
+        """What `node` writes, the path it writes to and whether that is a
+        `pathlib.Path` written through its own method; None when it does not write."""
         qualified = module.symbols.qualified_name(node.func)
         openers = _STREAMS if qualified in _STREAMS else _ARCHIVES
         if qualified in openers:
@@ -204,20 +209,30 @@ class WriteInPlace(Rule):
                 and isinstance(mode.value, str)
                 and _rewrites(mode.value, archive=openers is _ARCHIVES)
             ):
-                return '%s(..., %r)' % (ast.unparse(node.func), mode.value), path
+                return '%s(..., %r)' % (ast.unparse(node.func), mode.value), path, False
             return None
         if qualified in _COPIES:
             destination = _argument(node, *_COPIES[qualified])
             if destination is not None:
-                return ast.unparse(node.func), destination
+                return ast.unparse(node.func), destination, False
             return None
         if (
-            qualified is None
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr in _PATH_WRITES
-            and module.symbols.qualified_name(node.func.value) is None
+            qualified is not None
+            or not isinstance(node.func, ast.Attribute)
+            or module.symbols.qualified_name(node.func.value) is not None
         ):
-            return node.func.attr, node.func.value
+            return None
+        if node.func.attr in _PATH_WRITES:
+            return node.func.attr, node.func.value, True
+        if node.func.attr == 'open':
+            mode = _argument(node, 0, 'mode')
+            if (
+                isinstance(mode, ast.Constant)
+                and isinstance(mode.value, str)
+                and set(mode.value) <= _MODE_LETTERS
+                and _rewrites(mode.value, archive=False)
+            ):
+                return 'open(..., %r)' % (mode.value,), node.func.value, True
         return None
 
 

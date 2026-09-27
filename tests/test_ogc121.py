@@ -133,3 +133,44 @@ def test_editing_or_creating_a_file_is_writing_it_in_place(mode):
 
 def test_appending_to_an_archive_rewrites_its_index_in_place():
     assert len(_found('import zipfile\ndef f(p):\n    zipfile.ZipFile(p, "a")\n')) == 1
+
+
+@pytest.mark.parametrize(
+    'call',
+    [
+        'pathlib.Path(where).open("w")',
+        'where.open(mode="wb")',
+        'self.record.open("x")',
+    ],
+)
+def test_a_path_opened_to_write_by_its_own_method_is_reported(call):
+    source = 'import pathlib\ndef save(self, where):\n    with %s as handle:\n        handle.write("x")\n' % (call,)
+    assert len(_found(source)) == 1
+
+
+@pytest.mark.parametrize(
+    'call',
+    [
+        'where.open()',
+        'where.open("r")',
+        'where.open("a")',
+        'archive.open(member, "w")',
+        'archive.open("x.txt")',
+        'where.open(mode)',
+    ],
+)
+def test_a_path_opened_to_read_or_append_or_a_member_is_not_reported(call):
+    source = 'def load(where, archive, member, mode):\n    return %s\n' % (call,)
+    assert _found(source) == []
+
+
+def test_a_path_opened_by_its_method_and_renamed_into_place_is_not_reported():
+    source = (
+        'import pathlib\n'
+        'def save(where):\n'
+        '    partial = pathlib.Path(where + ".partial")\n'
+        '    with partial.open("w") as handle:\n'
+        '        handle.write("x")\n'
+        '    partial.replace(where)\n'
+    )
+    assert _found(source) == []
