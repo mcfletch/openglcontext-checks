@@ -70,3 +70,23 @@ def test_a_field_of_the_module_s_own_table_is_not_a_document_value():
 def test_a_field_of_a_parameter_s_table_is_a_document_value():
     source = 'HINTS = {}\ndef most(hints):\n    return int(hints["maxParticles"]["maximum"])\n'
     assert len(_found(source)) == 1
+
+
+@pytest.mark.parametrize(
+    'expression',
+    [
+        'float(extras.get("rate") or 1.0)',
+        'int(d["n"] or 0)',
+        'float(d.get("a") if flag else 2.0)',
+        'float(2.0 if flag else d["a"])',
+    ],
+)
+def test_a_default_given_with_or_or_a_condition_is_still_the_documents(expression):
+    """`x.get(k) or default` reaches the conversion with the file's value."""
+    source = 'def f(extras, d, flag):\n    return %s\n' % (expression,)
+    assert len(_found(source)) == 1
+
+
+def test_a_choice_between_the_programs_own_values_is_not_a_document_field():
+    source = 'def f(a, b, flag):\n    return float(a or b) + float(1.0 if flag else 2.0)\n'
+    assert _found(source) == []

@@ -174,8 +174,9 @@ not asked for the items.
 
 A call to the builtin `float`, `int` or `bool` whose first argument is a
 subscript by a string literal (`extras['depth']`) or a `get` call with a
-string literal first (`params.get('count', 0)`), in the `loader` scope. A
-misspelt value raises and aborts the load, `1e999` and `nan` pass `float`,
+string literal first (`params.get('count', 0)`), in the `loader` scope,
+including one given a default with `or` (`extras.get('rate') or 1.0`) or
+chosen by a conditional expression. A misspelt value raises and aborts the load, `1e999` and `nan` pass `float`,
 a count of four billion passes `int`, and `bool('false')` is true. An index
 by a number or a variable (`shape[0]`, `values[key]`), and a field of a table
 the module itself defines or imports, are not reported. Read
@@ -184,6 +185,7 @@ default: `OpenGLContext.loaders.documentvalues.DocumentValues`.
 
 ```python
 rate = float(extras['rate'])                                   # OGC101
+rate = float(extras.get('rate') or 1.0)                        # OGC101
 rate = values.number(extras.get('rate'), 1.0, 'emitter rate', minimum=0.0)  # not reported
 ```
 

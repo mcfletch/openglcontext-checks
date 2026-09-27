@@ -47,6 +47,8 @@ def test_only_the_loader_scope_is_checked():
         'return open(os.path.join(base, *names))',
         'return open(table["texture"])',
         'return open(table.get("texture"))',
+        'return open(table.get("texture") or "default.png")',
+        'return open(os.path.join(base, table.get("texture") or "x.png"))',
         'where = os.path.join(base, name)\nreturn open(where)',
         'where = base\nwhere += name\nreturn open(where)',
         'for member in names:\n    open(os.path.join(base, member))',

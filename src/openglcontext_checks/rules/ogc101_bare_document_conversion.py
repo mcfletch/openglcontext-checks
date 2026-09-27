@@ -103,8 +103,15 @@ def named_field(node: ast.expr, symbols: Symbols) -> bool:
     """Whether `node` reads a field named by a string literal from a mapping it was handed.
 
     A table the module itself holds (a constant, or a name it imports) is the
-    program's own data rather than a document's.
+    program's own data rather than a document's.  A default given with ``or``,
+    or a choice made with a conditional expression, reads one where any of its
+    values does: ``extras.get('rate') or 1.0`` is the file's value whenever the
+    file has one.
     """
+    if isinstance(node, ast.BoolOp):
+        return any(named_field(value, symbols) for value in node.values)
+    if isinstance(node, ast.IfExp):
+        return named_field(node.body, symbols) or named_field(node.orelse, symbols)
     if isinstance(node, ast.Subscript):
         key, table = node.slice, node.value
     elif (
