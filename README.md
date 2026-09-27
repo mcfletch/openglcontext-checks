@@ -235,8 +235,9 @@ card = Image.open(fetch.local_copy(fetch.beside(directory, species['card'])))  #
 with a literal mode that writes over what the file holds (`w`, `x`, or `+`
 other than to append); `tarfile.open` or `zipfile.ZipFile` with a mode that
 writes (`w`, `a`, `x`); `shutil.copy`, `copy2`, `copyfile` or `copytree` to a
-destination; and `write_text` or `write_bytes` on anything that is not an
-imported module. Not run in the `test` scope. A write cut short leaves part
+destination; and `write_text`, `write_bytes`, or `open` with a literal
+mode that writes, on anything that is not an imported module (a
+`pathlib.Path`). Not run in the `test` scope. A write cut short leaves part
 of the file, which the next run takes for the whole. Not reported: a write
 under a directory or to a file that a sanctioned staging call
 (`OpenGLContext.atomicfiles.staged_file`, `staged_directory`) or
