@@ -423,6 +423,29 @@ def test_teardown():
         pass
 ```
 
+### OGC232: override renames an inherited parameter
+
+An override replaces the base class's method, so the base's parameter names are
+part of the interface: a caller reaching the base by keyword, and a type
+checker reading the base's signature, both use them. A subclass that writes
+`_over` where the base wrote `over` has changed that name, and only an
+underscore has been added to a parameter it does not read. The unused-argument
+warning the underscore silences is answered instead by keeping the base's names
+and naming the suppressed code with a reason. Only a parameter whose sole
+change is a leading `_` is reported; a rename that is not an underscore prefix
+is not. The base is resolved through the class's imports, so a base defined in
+another module of the project is read from disk and its method compared.
+
+```python
+class Clocked:
+    def send(self, over, now):        # base
+        pass
+
+class Courier(Clocked):
+    def send(self, _over, _now):      # OGC232
+        pass
+```
+
 ## Checked types, in mypy
 
 A checked type is a value whose type says a check has been made: a path held

@@ -37,6 +37,37 @@ def test_a_stored_result_comes_back_for_the_same_key(tmp_path):
     assert again.lookup('b.py', key) is None
 
 
+def test_an_entry_misses_when_a_file_it_read_has_changed(tmp_path):
+    base = tmp_path / 'base.py'
+    base.write_text('class Base:\n    def end(self, over):\n        pass\n')
+    cache = ResultCache(str(tmp_path))
+    key = entry_key(b'x = 1\n', 'OGC131|')
+    cache.store('a.py', key, FOUND, [str(base)])
+    cache.save()
+    assert ResultCache(str(tmp_path)).lookup('a.py', key) == FOUND
+    base.write_text('class Base:\n    def end(self, renamed):\n        pass\n')
+    assert ResultCache(str(tmp_path)).lookup('a.py', key) is None
+
+
+def test_an_entry_misses_when_a_file_it_read_is_gone(tmp_path):
+    base = tmp_path / 'base.py'
+    base.write_text('x = 1\n')
+    cache = ResultCache(str(tmp_path))
+    key = entry_key(b'x = 1\n', 'OGC131|')
+    cache.store('a.py', key, FOUND, [str(base)])
+    cache.save()
+    base.unlink()
+    assert ResultCache(str(tmp_path)).lookup('a.py', key) is None
+
+
+def test_a_read_file_that_cannot_be_read_is_not_recorded(tmp_path):
+    cache = ResultCache(str(tmp_path))
+    key = entry_key(b'x = 1\n', 'OGC131|')
+    cache.store('a.py', key, FOUND, [str(tmp_path / 'gone.py')])
+    cache.save()
+    assert ResultCache(str(tmp_path)).lookup('a.py', key) == FOUND
+
+
 def test_the_key_covers_content_settings_and_the_rules_themselves(monkeypatch):
     base = entry_key(b'x = 1\n', 'OGC131|')
     assert entry_key(b'x = 1\n', 'OGC131|') == base

@@ -6,9 +6,11 @@ reported for it. The key is a hash of the file's bytes, of this package's own
 source (which is what decides the findings, and changes in an editable install
 without a new version number) and of the settings that decide the file's
 findings (the codes that run on it, the scopes it is in and the project's
-sanctioned names), so an edit to the
-file, to the rules or to the configuration each make the entry miss. A hit reports the stored findings without reading the
-syntax tree.
+sanctioned names), so an edit to the file, to the rules or to the
+configuration each make the entry miss. An entry also carries a digest of each
+other file a rule read to check the module, so an entry whose findings came
+from a module that has since changed is a miss too. A hit reports the stored
+findings without reading the syntax tree.
 
 The file is replaced whole: written to a temporary file beside it, then moved
 over it with one rename, so a reader never sees half of one. The directory
@@ -26,7 +28,7 @@ import json
 import os
 import secrets
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
 from .findings import Finding
 
@@ -70,6 +72,17 @@ def entry_key(content: bytes, settings: str) -> str:
     return digest.hexdigest()
 
 
+def file_digest(path: str) -> str | None:
+    """The hexadecimal SHA-256 of the file at `path`, or None if it cannot be read."""
+    digest = hashlib.sha256()
+    try:
+        with open(path, 'rb') as handle:
+            digest.update(handle.read())
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
 class ResultCache:
     """The stored findings for one project."""
 
@@ -81,23 +94,41 @@ class ResultCache:
         self._changed = False
 
     def lookup(self, path: str, key: str) -> list[Finding] | None:
-        """The findings stored for the project-relative `path` under `key`, or None."""
+        """The findings stored for the project-relative `path` under `key`, or None.
+
+        None when a file the findings were read from has since changed or gone,
+        so a rule that resolves other modules is not answered from a stale entry.
+        """
         entry = self._entries.get(path)
         if entry is None or entry.get('key') != key:
             return None
         stored = entry.get('findings')
         if not isinstance(stored, list):
             return None
+        reads = entry.get('reads')
+        if isinstance(reads, dict):
+            for dependency, digest in reads.items():
+                if not isinstance(digest, str) or file_digest(dependency) != digest:
+                    return None
         return [Finding(*item) for item in stored]
 
-    def store(self, path: str, key: str, findings: Sequence[Finding]) -> None:
-        """Record `findings` for `path` under `key`."""
+    def store(
+        self, path: str, key: str, findings: Sequence[Finding], reads: Iterable[str] = ()
+    ) -> None:
+        """Record `findings` for `path` under `key`, and a digest of each file read."""
         if not self.enabled:
             return
         entry: dict[str, object] = {
             'key': key,
             'findings': [[f.line, f.column, f.code, f.message] for f in findings],
         }
+        digests = {
+            dependency: digest
+            for dependency in reads
+            if (digest := file_digest(dependency)) is not None
+        }
+        if digests:
+            entry['reads'] = digests
         if self._entries.get(path) != entry:
             self._entries[path] = entry
             self._changed = True

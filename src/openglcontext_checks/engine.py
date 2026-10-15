@@ -39,6 +39,7 @@ class ParseError(Exception):
 class Module:
     """One module as the rules see it."""
 
+    #: The module's path on disk: a rule resolving an import reads from it.
     path: str
     tree: ast.Module
     symbols: Symbols
@@ -47,6 +48,8 @@ class Module:
     scopes: frozenset[str]
     #: Rule code to the project's own sanctioned names, where it names any.
     sanctioned: Mapping[str, tuple[str, ...]] = dataclasses.field(default_factory=dict)
+    #: Other files a rule read to check this module: its findings depend on them.
+    reads: set[str] = dataclasses.field(default_factory=set)
 
 
 def parse_module(

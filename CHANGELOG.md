@@ -17,9 +17,10 @@ compatibility promise.
   `checked-types` and `contained-paths` keys add a project's own.
 - The rules OGC131 (`id()` as a key), OGC141 (GL call in `__del__`), OGC161
   (configuration or I/O at import), OGC201 (suppression without a reason),
-  and, in the `test` scope, OGC221 (skip inside an `except`), OGC222 (test
-  with no assertion) and OGC223 (`pass` in a test's handler). Each carries
-  `VALID` and `INVALID` examples that the suite runs.
+  OGC232 (an override renames an inherited parameter), and, in the `test`
+  scope, OGC221 (skip inside an `except`), OGC222 (test with no assertion) and
+  OGC223 (`pass` in a test's handler). Each carries `VALID` and `INVALID`
+  examples that the suite runs.
 - `oglc-check [paths]`, printing `path:line:column: CODE message` with `/`
   separators whatever the platform's own is, and with `--statistics`,
   `--select`, `--ignore`, `--no-cache` and `--jobs`. Exit status 0 clean,

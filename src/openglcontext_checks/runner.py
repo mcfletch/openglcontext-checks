@@ -26,9 +26,12 @@ PARALLEL_THRESHOLD = 48
 #: The most worker processes a run starts by default.
 MAXIMUM_JOBS = 8
 
-#: One file to check: its project-relative path, its bytes, the codes that run
-#: on it, the scopes it is in, and the project's sanctioned names.
-_Task = tuple[str, bytes, frozenset[str], frozenset[str], tuple[tuple[str, tuple[str, ...]], ...]]
+#: One file to check: its project-relative path, its absolute path, its bytes,
+#: the codes that run on it, the scopes it is in, and the project's sanctioned
+#: names. A rule resolving an import reads the base from the absolute path.
+_Task = tuple[
+    str, str, bytes, frozenset[str], frozenset[str], tuple[tuple[str, tuple[str, ...]], ...]
+]
 
 
 @dataclasses.dataclass
@@ -127,27 +130,30 @@ def check_files(
         tasks.append(
             (
                 relative,
+                path,
                 content,
                 config.codes_for(relative),
                 config.scopes_for(relative),
                 config.sanctioned,
             )
         )
-    for relative, outcome in _run(tasks, jobs):
+    for relative, outcome, reads in _run(tasks, jobs):
         if isinstance(outcome, ParseError):
             errors.append(
                 '%s:%d:%d: cannot parse: %s'
                 % (shown[relative], outcome.line, outcome.column, outcome.message)
             )
             continue
-        results.store(relative, keys[relative], outcome)
+        results.store(relative, keys[relative], outcome, reads)
         findings.extend((shown[relative], finding) for finding in outcome)
     results.save()
     findings.sort(key=lambda item: (item[0], item[1]))
     return Report(findings, sorted(errors), len(files), len(tasks))
 
 
-def _run(tasks: list[_Task], jobs: int | None) -> list[tuple[str, list[Finding] | ParseError]]:
+def _run(
+    tasks: list[_Task], jobs: int | None
+) -> list[tuple[str, list[Finding] | ParseError, list[str]]]:
     workers = jobs if jobs is not None else min(os.cpu_count() or 1, MAXIMUM_JOBS)
     if len(tasks) < PARALLEL_THRESHOLD or workers < 2:
         return [_check(task) for task in tasks]
@@ -156,14 +162,15 @@ def _run(tasks: list[_Task], jobs: int | None) -> list[tuple[str, list[Finding] 
         return list(pool.map(_check, tasks, chunksize=chunk))
 
 
-def _check(task: _Task) -> tuple[str, list[Finding] | ParseError]:
-    """One file's findings, or why it could not be parsed; run in a worker."""
-    relative, content, codes, scopes, sanctioned = task
+def _check(task: _Task) -> tuple[str, list[Finding] | ParseError, list[str]]:
+    """One file's findings and the files it read, or why it could not be parsed."""
+    relative, path, content, codes, scopes, sanctioned = task
     try:
-        module = parse_module(content, relative, scopes, dict(sanctioned))
+        module = parse_module(content, path, scopes, dict(sanctioned))
     except ParseError as error:
-        return relative, error
-    return relative, run_rules(module, [RULES[code] for code in sorted(codes)])
+        return relative, error, []
+    findings = run_rules(module, [RULES[code] for code in sorted(codes)])
+    return relative, findings, sorted(module.reads)
 
 
 def _relative(config: Config, path: str) -> str:
