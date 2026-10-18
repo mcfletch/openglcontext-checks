@@ -63,9 +63,12 @@ def parse_module(
             warnings.simplefilter('ignore')
             tree = ast.parse(source, filename=path)
         pragmas = read_pragmas(source)
-    except (SyntaxError, ValueError, tokenize.TokenError) as error:
+    except (SyntaxError, ValueError, tokenize.TokenError, RecursionError) as error:
         # A null byte is a ValueError from `ast` before Python 3.12 and a
         # SyntaxError from it after; the position is there when one is known.
+        # `ast.parse` recurses as it builds, so source nested deeper than the
+        # platform's stack allows is a RecursionError: a file this interpreter
+        # cannot parse, reported as one rather than ending the run.
         line = getattr(error, 'lineno', None) or 1
         column = getattr(error, 'offset', None) or 1
         message = getattr(error, 'msg', None) or str(error)

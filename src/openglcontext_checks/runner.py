@@ -172,8 +172,12 @@ def _relative(config: Config, path: str) -> str:
 
 
 def _shown(path: str, cwd: str) -> str:
-    """`path` as a user in `cwd` would name it."""
+    """`path` as a user in `cwd` would name it, with `/` separators.
+
+    A finding names a file the way the configuration's globs, a `# noqa` and
+    the result cache do, so one run's output reads the same on every platform.
+    """
     try:
-        return os.path.relpath(path, cwd)
+        return os.path.relpath(path, cwd).replace(os.sep, '/')
     except ValueError:  # another drive, on Windows
-        return path
+        return path.replace(os.sep, '/')

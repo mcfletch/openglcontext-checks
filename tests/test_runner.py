@@ -88,7 +88,9 @@ def test_a_file_on_another_drive_is_shown_by_its_full_path(root, monkeypatch):
     files = discover(config, ['a.py'], str(root))
     monkeypatch.setattr(runner.os.path, 'relpath', across_drives)
     report = check_files(config, files, cwd=str(elsewhere), cache=False)
-    assert [shown for shown, _finding in report.findings] == files
+    assert [shown for shown, _finding in report.findings] == [
+        name.replace(os.sep, '/') for name in files
+    ]
 
 
 def test_a_parse_error_survives_the_trip_from_a_worker():

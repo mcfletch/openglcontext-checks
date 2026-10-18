@@ -1,7 +1,6 @@
 """`oglc-check`: what it checks, what it prints and how it exits."""
 
 import io
-import os
 import textwrap
 
 import pytest
@@ -54,6 +53,14 @@ def test_findings_are_printed_sorted_and_exit_one(project, capsys):
     ]
     assert lines[0].startswith('a.py:3:11: OGC131 id(mesh) as a key')
     assert 'OGC222 test_draws has no assertion' in lines[2]
+
+
+def test_a_path_is_printed_with_slashes_whatever_the_platform_separator_is(project, capsys):
+    """The configuration, the cache and the findings all name a file the same way."""
+    project({'sub/deep/a.py': KEYED})
+    code, lines, _err = _run(capsys)
+    assert code == 1
+    assert lines[0].startswith('sub/deep/a.py:3:11: OGC131')
 
 
 def test_a_test_rule_is_confined_to_the_test_scope(project, capsys):
@@ -123,21 +130,14 @@ def test_a_named_path_is_checked_whatever_the_exclusions_say(project, capsys):
     """As ruff does: naming a path is asking for it."""
     project({'build/d.py': KEYED, 'build/sub/.cache/e.py': KEYED})
     assert _run(capsys)[0] == 0
-    assert [line.split(':')[0] for line in _run(capsys, 'build/d.py')[1]] == [
-        os.path.join('build', 'd.py')
-    ]
-    assert [line.split(':')[0] for line in _run(capsys, 'build')[1]] == [
-        os.path.join('build', 'd.py')
-    ]
+    assert [line.split(':')[0] for line in _run(capsys, 'build/d.py')[1]] == ['build/d.py']
+    assert [line.split(':')[0] for line in _run(capsys, 'build')[1]] == ['build/d.py']
 
 
 def test_a_run_from_a_subdirectory_prints_paths_from_there(project, capsys, monkeypatch):
     root = project({'a.py': KEYED, 'sub/b.py': KEYED})
     monkeypatch.chdir(root / 'sub')
-    assert [line.split(':')[0] for line in _run(capsys)[1]] == [
-        os.path.join('..', 'a.py'),
-        'b.py',
-    ]
+    assert [line.split(':')[0] for line in _run(capsys)[1]] == ['../a.py', 'b.py']
 
 
 def test_a_reasoned_noqa_suppresses_and_an_unreasoned_one_is_reported(project, capsys):
@@ -193,9 +193,7 @@ def test_a_dot_directory_is_skipped_unless_it_is_named(project, capsys):
     """Tool state, virtualenvs and worktrees live in them."""
     project({'.claude/worktrees/b/a.py': KEYED, '.hidden/tool.py': KEYED})
     assert _run(capsys)[0] == 0
-    assert [line.split(':')[0] for line in _run(capsys, '.hidden')[1]] == [
-        os.path.join('.hidden', 'tool.py')
-    ]
+    assert [line.split(':')[0] for line in _run(capsys, '.hidden')[1]] == ['.hidden/tool.py']
 
 
 def test_a_reader_that_stops_early_is_not_an_error(project, monkeypatch):

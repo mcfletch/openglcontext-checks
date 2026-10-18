@@ -7,9 +7,10 @@
     oglc-check --select OGC131,OGC2   # these rules only
     oglc-check --ignore OGC222        # all but these
 
-Findings print as `path:line:column: CODE message`, in path and line order.
-The exit status is 0 when there are none, 1 when there are, and 2 when the
-command line or the configuration is wrong or a file could not be parsed.
+Findings print as `path:line:column: CODE message`, in path and line order,
+with `/` between the parts of a path whatever the platform separator is. The
+exit status is 0 when there are none, 1 when there are, and 2 when the command
+line or the configuration is wrong or a file could not be parsed.
 """
 
 from __future__ import annotations

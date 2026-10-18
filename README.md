@@ -29,10 +29,11 @@ $ oglc-check --no-cache             # neither read nor write the result cache
 ```
 
 Findings print as `path:line:column: CODE message`, sorted by path and line,
-with paths relative to the current directory. `--statistics` prints a count
-per rule instead. The exit status is 0 when there are no findings, 1 when
-there are, and 2 for a usage or configuration error or a file that does not
-parse; a file that does not parse is named on standard error.
+with paths relative to the current directory and `/` between the parts of one,
+whatever the platform separator is. `--statistics` prints a count per rule
+instead. The exit status is 0 when there are no findings, 1 when there are,
+and 2 for a usage or configuration error or a file that does not parse; a file
+that does not parse is named on standard error.
 
 `--select` replaces the configured selection and `--ignore` adds to the
 configured ignores. `--jobs N` sets the number of worker processes; a run

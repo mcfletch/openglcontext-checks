@@ -187,10 +187,15 @@ def test_parents_and_ancestors_lead_back_to_the_module():
 
 
 def test_a_deeply_nested_expression_does_not_exhaust_the_stack():
-    source = 'value = ' + ' + '.join(['x'] * 5000) + '\n'
-    tree = ast.parse(source)
+    """The tree is built rather than parsed: `ast.parse` nests only as deep as the stack."""
+    value = ast.Name(id='x', ctx=ast.Load())
+    for _ in range(5000):
+        value = ast.BinOp(left=value, op=ast.Add(), right=ast.Name(id='x', ctx=ast.Load()))
+    assign = ast.Assign(targets=[ast.Name(id='value', ctx=ast.Store())], value=value)
+    tree = ast.Module(body=[assign], type_ignores=[])
     symbols = Symbols(tree)
     assert symbols.scope_of(tree.body[0].value) is tree
+    assert symbols.lookup(tree.body[0].targets[0]).kind == LOCAL
 
 
 def test_a_star_import_in_a_class_body_is_not_seen_from_its_methods():

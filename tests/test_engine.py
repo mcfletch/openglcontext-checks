@@ -168,6 +168,21 @@ def test_an_error_without_a_position_is_placed_at_the_start():
     assert 'EOF in multi-line statement' in caught.value.message
 
 
+def test_source_the_parser_cannot_nest_that_deeply_is_an_error_not_a_traceback():
+    """Nesting deeper than `ast.parse` can build is a file that does not parse."""
+
+    def refuse(_source, **_keywords):
+        raise RecursionError('maximum recursion depth exceeded during ast construction')
+
+    with (
+        unittest.mock.patch.object(engine.ast, 'parse', refuse),
+        pytest.raises(ParseError) as caught,
+    ):
+        parse_module(b'value = x + x', 'deep.py')
+    assert (caught.value.line, caught.value.column) == (1, 1)
+    assert 'recursion' in caught.value.message
+
+
 def test_a_syntax_warning_in_the_checked_source_is_not_raised():
     """An invalid escape is a warning from the compiler, and the module still parses."""
     with warnings.catch_warnings():

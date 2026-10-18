@@ -20,9 +20,10 @@ compatibility promise.
   and, in the `test` scope, OGC221 (skip inside an `except`), OGC222 (test
   with no assertion) and OGC223 (`pass` in a test's handler). Each carries
   `VALID` and `INVALID` examples that the suite runs.
-- `oglc-check [paths]`, printing `path:line:column: CODE message`, with
-  `--statistics`, `--select`, `--ignore`, `--no-cache` and `--jobs`. Exit
-  status 0 clean, 1 findings, 2 usage, configuration or parse error.
+- `oglc-check [paths]`, printing `path:line:column: CODE message` with `/`
+  separators whatever the platform's own is, and with `--statistics`,
+  `--select`, `--ignore`, `--no-cache` and `--jobs`. Exit status 0 clean,
+  1 findings, 2 usage, configuration or parse error.
 - `--force-exclude`: a path named on the command line that is outside the
   project, outside `paths` or excluded is passed over, as a run with no
   arguments would pass over it.
